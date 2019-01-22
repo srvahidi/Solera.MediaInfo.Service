@@ -9,5 +9,7 @@ namespace Solera.MediaInfo.Service.Models
     public class PhotoUploadRequest
     {
         public IFormFile photo { get; set; }
+        public string FileName { get; set; }
+        public string ValuationNumber { get; set; }
     }
 }

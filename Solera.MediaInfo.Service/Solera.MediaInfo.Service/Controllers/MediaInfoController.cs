@@ -19,20 +19,6 @@ namespace Solera.MediaInfo.Service.Controllers
     [ApiController]
     public class MediaInfoController : ControllerBase
     {
-        // GET: api/MediaInfo
-        [HttpGet]
-        public IEnumerable<string> Get()
-        {
-            return new string[] { "value1", "value2" };
-        }
-
-        // GET: api/MediaInfo/5
-        [HttpGet("{id}", Name = "Get")]
-        public string Get(int id)
-        {
-            return "value";
-        }
-
         // POST: api/MediaInfo
         [HttpPost("photo")]
         public async Task<object> PostPhoto([FromForm] PhotoUploadRequest request)
@@ -40,93 +26,29 @@ namespace Solera.MediaInfo.Service.Controllers
             BasicAWSCredentials credentials = new BasicAWSCredentials("AKIAID3MAMFSUEUCVWFQ", "4THQSOA10tKIy3yxjWYz1jLOodcsgcVUXZVrycgS");
             IAmazonS3 _s3Client = new AmazonS3Client(credentials, RegionEndpoint.USEast1);
 
+            //This code needs to be moved to the actual externalApi section and through Interfaces and dependency Injection.
+            // Just that I am trying the possibility of moving this code to Content delivery service instead of creating another service
+            // If that plan falls apart and if we need to maintain this service, this code needs to be refactored accordingly. Whenever that
+            // happens, we need the bucket name to be read probably from the environment variable.
+
             try
             {
-                byte[] imageArray = System.IO.File.ReadAllBytes(@"C:\\temp\\bugatti-veyron-2011.jpg");
-                //using (Image image = Image.Jpeg("C:\\temp\\bugatti-veyron-2011.jpg"))
-                //{
-                //    using (MemoryStream m = new MemoryStream())
-                //    {
-                //        image.Save(m, image.RawFormat);
-                //        byte[] imageBytes = m.ToArray();
-
-                //        // Convert byte[] to Base64 String
-                //        string base64String = Convert.ToBase64String(imageBytes);
-                //        return base64String;
-                //    }
-                //}
-                string base64ImageRepresentation = Convert.ToBase64String(imageArray);
-
-                var bytes = Convert.FromBase64String(base64ImageRepresentation);
-
-                var memst = new MemoryStream(bytes);
-                var contents = new StreamContent(new MemoryStream(bytes));
-
-                //var img = Image.(new MemoryStream(Convert.FromBase64String(base64ImageRepresentation)));
-
-                var fileTransferUtility =
-                    new TransferUtility(_s3Client);
-
-                //fileTransferUtility.UploadDirectoryAsync()
-                //await fileTransferUtility.UploadDirectoryAsync("Claims",                    "gotimedrivervideos");
-                //// Option 1. Upload a file. The file name is used as the object key name.
-                //await fileTransferUtility.UploadAsync("C:\\temp\\bugatti-veyron-2011.jpg", "gotimedrivervideos" + "/09-98AE-12U34");
-                //Console.WriteLine("Upload 1 completed");
-
-
-                // Option 2. Specify object key name explicitly.
-                //await fileTransferUtility.UploadAsync("C:\\temp\\bugatti-veyron-2011.jpg", "gotimedrivervideos", "AKIAID3MAMFSUEUCVWFQ");
-                //await fileTransferUtility.UploadAsync("C:\\temp\\bugatti-veyron-2011.jpg", "gotimedrivervideos", "4THQSOA10tKIy3yxjWYz1jLOodcsgcVUXZVrycgS");
-
-                //Console.WriteLine("Upload 2 completed");
-
-                // Option 3. Upload data from a type of System.IO.Stream.
-                using (var fileToUpload =
-                    new FileStream(@"C:\temp\bugatti-veyron-2011.jpg", FileMode.Open, FileAccess.Read))
+                using (var memStream = new MemoryStream())
                 {
+                    request.photo.CopyTo(memStream);
 
-                    await fileTransferUtility.UploadAsync(memst,
-                                               "gotimedrivervideos" + "/09-98AE-12U33", "bugatti-veyron-201xx.jpg");
+                    Console.WriteLine("POST PHOTO : Photo data copied to MemoryStream object!");
+                    var fileTransferUtility = new TransferUtility(_s3Client);
+
+                    await fileTransferUtility.UploadAsync(memStream,
+                                               "gotimedrivervideos/" + request.ValuationNumber, request.FileName);
+                    return StatusCode(StatusCodes.Status200OK, "Photo uploaded successful!!");
                 }
-                //Console.WriteLine("Upload 3 completed");
-
-                //// Option 4. Specify advanced settings.
-                //var fileTransferUtilityRequest = new TransferUtilityUploadRequest
-                //{
-                //    BucketName = bucketName,
-                //    FilePath = filePath,
-                //    StorageClass = S3StorageClass.StandardInfrequentAccess,
-                //    PartSize = 6291456, // 6 MB.
-                //    Key = keyName,
-                //    CannedACL = S3CannedACL.PublicRead
-                //};
-                //fileTransferUtilityRequest.Metadata.Add("param1", "Value1");
-                //fileTransferUtilityRequest.Metadata.Add("param2", "Value2");
-
-                //await fileTransferUtility.UploadAsync(fileTransferUtilityRequest);
-                //Console.WriteLine("Upload 4 completed");
-            }
-            catch (AmazonS3Exception e)
-            {
-                Console.WriteLine("Error encountered on server. Message:'{0}' when writing an object", e.Message);
             }
             catch (Exception e)
             {
-                Console.WriteLine("Unknown encountered on server. Message:'{0}' when writing an object", e.Message);
+                return StatusCode(StatusCodes.Status200OK, $"Photo uploaded failed with error {e.Message}!!");
             }
-            return null;
-        }
-
-        // PUT: api/MediaInfo/5
-        [HttpPut("{id}")]
-        public void Put(int id, [FromBody] string value)
-        {
-        }
-
-        // DELETE: api/ApiWithActions/5
-        [HttpDelete("{id}")]
-        public void Delete(int id)
-        {
         }
     }
 }
