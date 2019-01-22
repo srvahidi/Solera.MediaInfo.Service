@@ -1,0 +1,2 @@
+# Solera.MediaInfo.Service
+
