@@ -75,13 +75,13 @@ namespace Solera.MediaInfo.Service.Controllers
             }
             catch (Exception e)
             {
-                Logging.LogInformation("POST S4 : The file upload failed with the error {1}",
+                Logging.LogInformation("POST S4 : The file upload failed with the error {0}",
                     e.Message);
-                return new HttpResponseMessage(HttpStatusCode.InternalServerError)
+                return StatusCode(StatusCodes.Status500InternalServerError, new
                 {
-                    Content = new StringContent(e.Message),
-                    ReasonPhrase = e.Message
-                };
+                    IsSuccess = false,
+                    Message = $"Error: {e.Message}"
+                });
             }
         }
     }
