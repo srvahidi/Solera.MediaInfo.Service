@@ -27,7 +27,7 @@ run:
     #cd ..
     #cd Solera.MediaInfo.Service
 
-    cd git-repo/Solera.MediaInfo.Service
+    cd git-repo/Solera.MediaInfo.Service/Solera.MediaInfo.Service
     dotnet publish -c release -o ./bin/Debug/netcoreapp2.1/publish
     cd ..
     mkdir -p ${PWD}/Solera.MediaInfo.Service/bin/Debug/netcoreapp2.1/publish/ci/pipelines
@@ -36,3 +36,4 @@ run:
     zip -r ${output_directory}/${filename} ./*
     
  
+  
