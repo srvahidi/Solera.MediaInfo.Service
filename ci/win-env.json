@@ -1,0 +1,27 @@
+{
+    "user-provided": [
+        {
+          "credentials": {
+            "FALCON_SERVICE_URL": "http://falcon.service/mobile.asp",
+            "FALCON_WEBAPI": "WebApi.asp",
+            "AUTHORITY": "authority.com",
+            "FALCON_COMMENTS_SVR": "http://falcon.service/CommentsSvr.asp",
+            "RESILIENCE_POLICY_MIN_WAIT_TIME_MSECS": 1000,
+            "RESILIENCE_POLICY_MAX_WAIT_TIME_MSECS": 20000,
+            "RESILIENCE_POLICY_MAX_RETRY_COUNT": 10,
+            "RESILIENCE_POLICY_MAX_PARALLELIZATION": 800,
+            "RESILIENCE_POLICY_MAX_QUEUING": 800
+          },
+            "name": "falcon"
+        },
+        {
+          "credentials": {
+            "REQUEST_QUEUE": "EagleRequest",
+            "EXCHANGE_NAME": "BackendServices",
+            "REQUEST_QUEUE_PRE_FETCH_COUNT": 20,
+            "AMQPUri": "amqp://localhost"
+          },
+            "name": "mq-config"
+        }
+    ]
+}

@@ -1,0 +1,21 @@
+---
+instance_limits:
+  min: 2
+  max: 4
+rules:
+#- rule_type: "http_throughput"
+  #rule_sub_type: ""
+  #threshold:
+     #min: 5
+     #max: 15
+- rule_type: "cpu"
+  rule_sub_type: ""
+  threshold:
+     min: 50
+     max: 80
+#- rule_type: "http_latency"
+ #rule_sub_type: "avg_99th"
+  #threshold:
+     #min: 10
+     #max: 20
+#scheduled_limit_changes: []
