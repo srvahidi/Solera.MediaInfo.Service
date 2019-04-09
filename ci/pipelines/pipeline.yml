@@ -1,4 +1,4 @@
-# this is dev and qa pipeline 
+# this is dev and qa pipeline for Mediainfo Service
 ---
 resource_types:
 - name: artifactory
