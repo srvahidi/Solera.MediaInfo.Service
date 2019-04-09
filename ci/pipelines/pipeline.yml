@@ -1,0 +1,357 @@
+# this is dev and qa pipeline 
+---
+resource_types:
+- name: artifactory
+  type: docker-image
+  source:
+    repository: pivotalservices/artifactory-resource
+    tag: latest
+    
+- name: metadata
+  type: docker-image
+  source:
+    repository: olhtbr/metadata-resource
+
+- name: teams-notification
+  type: docker-image
+  source:
+    repository: navicore/teams-notification-resource
+    tag: latest
+
+- name: project-metrics
+  type: docker-image
+  source:
+    repository: ((internal-docker-addr))/gdc/concourse-projectmetrics-resource
+    username: ((internal-docker-user))
+    password: ((internal-docker-pass))
+    tag: latest
+
+- name: cf-resource
+  type: docker-image
+  source:
+    repository: ((internal-docker-addr))/gdc/cf-resource
+    username: ((internal-docker-user))
+    password: ((internal-docker-pass))
+    tag: latest
+
+resources:
+
+- name: git-repo
+  type: git
+  source:
+    uri: ((bitbucket-uri))
+    branch: ((branch-name))
+    private_key: ((private-repo-key))
+    disable_ci_skip: true
+    source: &dev-source
+      cf_deploy_user: ((cf-preprd-username))
+      cf_deploy_password: ((cf-preprd-password))
+      cf_app_name: mis-dev
+      file_prefix: 'mediainfosvc'
+      cf_space: 'development'
+      cf_env: 'dev'
+      instance_number: 1
+      memory: 256M
+      cf_api: https://api.system-dev.gp2.axadmin.net
+      s3_access_key: BNDW1H4EWBFDJ36H61F3
+      s3_bucket: rms-development
+      s3_secret_key: WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g
+      s3_url: https://s3.gp2.axadmin.net
+      cf_organization: mobile_backend
+      teams_url: ((teams-webhook-url))
+      newrelic_app_lic: ''
+      buildpack_one: ''
+      buildpack_two: '- dotnet_core_buildpack'
+    source: &qa-source
+      cf_deploy_user: ((cf-preprd-username))
+      cf_deploy_password: ((cf-preprd-password))
+      artifactory-username: ((artifactory-username))
+      artifactory-password: ((artifactory-password))
+      cf_app_name: mis-int1
+      file_prefix: 'mediainfosvc'
+      cf_preceding_appname: mis-dev
+      cf_space: 'integration'
+      cf_env: 'dev'
+      cf_preceding_space: 'development'
+      setautoscale: true
+      instance_number: 2
+      autoscalepath: 'integration/integration-autoscale.json'
+      autoscaleinsatancename: Autosource-Autoscaler
+      memory: 256M
+      cf_api: https://api.system-dev.gp2.axadmin.net 
+      s3_access_key: BNDW1H4EWBFDJ36H61F3
+      s3_bucket: rms-integration
+      s3_secret_key: WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g
+      s3_url: https://s3.gp2.axadmin.net
+      cf_organization: mobile_backend
+      teams_url: ((teams-webhook-url))
+      newrelic_app_lic: ((new-relic-license-key))
+      buildpack_one: '- newrelic_dotnet_core_buildpack'
+      buildpack_two: '- dotnet_core_buildpack'
+
+- name: utility-dockerfile
+  type: git
+  source:
+    uri: ((bitbucket-uri))
+    branch: ((branch-name))
+    private_key: ((private-repo-key))
+    paths:
+      - ci/utility
+
+- name: dotnet-dockerfile
+  type: git
+  source:
+    uri: ((bitbucket-uri))
+    private_key: ((private-repo-key))
+    branch: ((branch-name))
+    paths:
+      - ci/dotnet 
+
+- name: artifacts
+  type: artifactory
+  source:
+    endpoint: https://na-artifact-01.na.audatex.com:8443/artifactory
+    repository: /autosource/valuations-service
+    regex: "mediainfosvc-(?<version>.*).zip"
+    username: ((artifactory-username))
+    password: ((artifactory-password))
+    skip_ssl_verification: true
+
+- name: dotnet-image
+  type: docker-image
+  source:
+    repository: ((internal-docker-addr))/gdc/mis_dotnet_dev
+    username: ((internal-docker-user))
+    password: ((internal-docker-pass))
+    tag: "latest"
+
+- name: utility-image
+  type: docker-image
+  source:
+    repository: ((internal-docker-addr))/gdc/mis_utility_dev
+    username: ((internal-docker-user))
+    password: ((internal-docker-pass))
+    tag: "latest"
+
+- name: cf-deploy
+  type: cf-resource
+  source: 
+    api: ((cf-preprd-api))
+    username: ((cf-preprd-username))
+    password: ((cf-preprd-password))
+    organization: mobile_backend
+    space: development
+    skip_cert_check: true
+
+- name: teams-alert
+  type: teams-notification
+  source:
+    url: '' #((teams-webhook-url))
+
+#- name: project-metrics
+  #type: project-metrics
+  #source:
+    #jiraboard: Autosource.Mobile
+    #apiurl: https://projectmetrics-api-qa.apps-dev.gp2.axadmin.net
+    #sonartoken: ((sonar-auth-token))
+    #tribelead: Christopher Klingler
+
+- name: metadata
+  type: metadata
+
+jobs:
+
+- name: build-dotnet-image
+  plan:
+  - get: dotnet-dockerfile
+    trigger: true
+    version: every
+  - put: dotnet-image
+    params: 
+      build: dotnet-dockerfile/ci/dotnet
+
+- name: build-utility-image
+  plan:
+  - get: utility-dockerfile
+    trigger: true
+    version: every
+  - put: utility-image
+    params:
+      build: utility-dockerfile/ci/utility
+
+- name: build-and-test-green
+  on_failure:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
+      text: Job $BUILD_JOB_NAME failed.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - get: dotnet-image
+  - get: git-repo
+    trigger: true
+    version: every   
+  
+  - task: build-test
+    image: dotnet-image
+    file: git-repo/ci/pipelines/tasks/build.yml
+    params:
+      <<: *dev-source
+  - put: artifacts
+    params:
+      file: artifacts/mediainfosvc-*.zip
+
+#- name: code-analysis-green
+  #on_failure:
+      #put: teams-alert
+      #params:
+        #title: |
+          #$BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
+        #text: Job $BUILD_JOB_NAME failed.
+        #actionName: View Job $BUILD_JOB_NAME Results
+        #actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  #plan:
+  #- get: git-repo    
+  #- get: artifacts
+    #trigger: true
+    #passed: 
+       #- build-and-test-green
+
+  #- task: execute-code-analysis
+    #file: git-repo/ci/pipelines/tasks/code-analysis.yml
+    #params:
+      #branch: ((branch-name))
+      #sonar-auth-token: ((sonar-auth-token))
+      #sonar-url: ((sonar-url))
+          
+  #ensure:
+     #put: project-metrics
+     #params:
+       #sourcedir: git-repo
+       #outputdir: analysis-output
+       #projectname: Mediainfo.Service-MIS  
+
+- name: deploy-green-dev
+  on_failure:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
+      text: Job $BUILD_JOB_NAME failed.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - get: utility-image
+  - get: git-repo      
+  - get: artifacts
+    version: every
+    trigger: true
+    passed:
+     - build-and-test-green #code-analysis-green
+  - task: prepare-manifest
+    image: utility-image
+    file: git-repo/ci/pipelines/tasks/prepare-manifest.yml
+    input_mapping: {git-repo: artifacts}
+    params:
+      <<: *dev-source
+  - put: cf-deploy
+    params:
+      manifest: deployables/ci/pipelines/manifest.yml
+      path: deployables
+
+- name: blue-green-switch-dev
+  on_failure:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
+      text: Job $BUILD_JOB_NAME failed.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - get: utility-image
+  - get: metadata
+  - get: git-repo
+    passed: 
+     - deploy-green-dev
+    trigger: true
+  - task: blue-to-green
+    image: utility-image
+    file: git-repo/ci/pipelines/tasks/blue-to-green.yml
+    params: 
+      <<: *dev-source
+
+- name: deploy-green-qa
+  on_failure:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME QA - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
+      text: Job $BUILD_JOB_NAME failed.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - get: utility-image
+  - get: git-repo
+    passed: 
+     - blue-green-switch-dev
+    trigger: false
+  - task: prepare-manifest
+    image: utility-image
+    file: git-repo/ci/pipelines/tasks/prepare-manifest.yml
+    params:
+      <<: *qa-source
+  - task: deploy-qa
+    image: utility-image
+    file: git-repo/ci/pipelines/tasks/cfpush.yml
+    params:
+      <<: *qa-source
+  - task: auto-scale
+    image: utility-image
+    file: git-repo/ci/pipelines/tasks/autoscale.yml
+    params:
+      <<: *qa-source   
+
+- name: blue-green-switch-qa
+  on_failure:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
+      text: Job $BUILD_JOB_NAME failed.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - get: metadata
+  - get: utility-image
+  - get: git-repo
+    passed: 
+     - deploy-green-qa
+    trigger: true
+  - task: blue-to-green
+    image: utility-image
+    file: git-repo/ci/pipelines/tasks/blue-to-green.yml
+    params: 
+      <<: *qa-source
+
+groups:
+
+- name: mis
+  jobs:
+  - build-and-test-green
+  - deploy-green-dev
+  - blue-green-switch-dev
+  #- code-analysis-green
+
+- name: mis-qa
+  jobs:
+  - deploy-green-qa
+  - blue-green-switch-qa
+
+- name: mis-worker-images
+  jobs:
+  - build-dotnet-image
+  - build-utility-image
+

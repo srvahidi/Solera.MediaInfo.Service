@@ -1,0 +1,34 @@
+﻿{
+  "$schema": "http://json.schemastore.org/launchsettings.json",
+  "iisSettings": {
+    "windowsAuthentication": false, 
+    "anonymousAuthentication": true, 
+    "iisExpress": {
+      "applicationUrl": "http://localhost:54618",
+      "sslPort": 44388
+    }
+  },
+  "profiles": {
+    "IIS Express": {
+      "commandName": "IISExpress",
+      "launchBrowser": true,
+      "launchUrl": "api/values",
+      "environmentVariables": {
+        "S3_ACCESS_KEY": "BNDW1H4EWBFDJ36H61F3",
+        "S3_BUCKET": "rms-development",
+        "S3_SECRET_KEY": "WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g",
+        "S3_URL": "\"https://s3.gp2.axadmin.net",
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "Solera.MediaInfo.Service": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "api/values",
+      "applicationUrl": "https://localhost:5001;http://localhost:5000",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
