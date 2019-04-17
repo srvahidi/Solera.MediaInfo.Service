@@ -1,0 +1,34 @@
+---
+
+platform: linux
+
+inputs:
+- name: git-repo
+
+run:
+  path: bash
+  args: 
+  - -exc
+  - |
+    set +x
+    cf login -u $cf_deploy_user -p $cf_deploy_password -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+    set -x
+    
+    if [ $setautoscale == true ]; then
+        #setup new autoscale service binding
+        cfspaceprefix=$(echo $cf_space)
+        cfspacegreenapps=$(cf apps | grep $cf_app_name-green | { grep -v grep || true; })
+
+        if [[ ! -z $cfspacegreenapps ]]; then                    
+            cf plugins
+            cf install-plugin ./git-repo/ci/pipelines/tasks/autoscaler-for-pcf-cliplugin-linux32-binary-2.0.91 -f
+            cf plugins
+            cf autoscaling-apps
+            cf bind-service $cf_app_name-green $autoscaleinsatancename
+            cf update-autoscaling-limits $cf_app_name-green 1 2
+            cf enable-autoscaling $cf_app_name-green
+            cf configure-autoscaling $cf_app_name-green ./git-repo/ci/pipelines/$cfspaceprefix/$cfspaceprefix-autoscale.yml
+            cf autoscaling-apps
+        fi
+    fi
+    

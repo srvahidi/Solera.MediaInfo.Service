@@ -1,0 +1,57 @@
+---
+
+platform: linux
+
+inputs:
+- name: git-repo
+- name: deployables
+
+run:
+  path: bash
+  args:
+  - -exc
+  - |
+    set +x
+    cfpass=$(printenv cf_deploy_password)
+    cfuser=$(printenv cf_deploy_user)
+    artifactorypass=$(printenv artifactory-password)
+    artifactoryuser=$(printenv artifactory-username)
+    cfappname=$(printenv cf_app_name)
+    
+    if [ "$cf_space" == "demo" ]; then
+     cf login -u $cf_dev_user -p $cf_dev_password -a https://api.system-$cf_preceding_env.gp2.axadmin.net -o $cf_organization -s $cf_preceding_space
+     precedingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_preceding_appname.apps-$cf_preceding_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+     set -x
+     cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+      workingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_app_name.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+    else
+     cf login -u $cfuser -p $cfpass -a $cf_api -o $cf_organization -s $cf_space
+     precedingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_preceding_appname.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+     echo "precedingversion" echo $precedingversion
+      set -x
+      workingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_app_name.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+     echo "workingversion" echo $workingversion
+    fi
+
+    if [ "$workingversion" = "$precedingversion" ]; then
+    echo "Skipping deployment...New version not available for deployment"
+    exit 0;
+    fi
+
+    index=`expr index "${precedingversion}" g`
+    git=$(echo ${precedingversion:$index})
+    artifact=$file_prefix-${precedingversion}.zip
+
+    #download zip file
+    set +x
+    curl -OL -k -u $artifactoryuser:$artifactorypass https://na-artifact-01.na.audatex.com:8443/artifactory/autosource/valuations-service/$artifact
+    set -x
+
+    #extract zip
+    output_directory=artifact-deployables
+    mkdir $output_directory
+    unzip -q $artifact -d $output_directory
+    cd $output_directory
+
+    #push artifacts to PCF
+    cf push -f ../deployables/ci/pipelines/manifest.yml    

@@ -1,0 +1,39 @@
+---
+
+platform: linux
+
+inputs:
+- name : git-repo
+outputs:
+- name: artifacts
+
+run:
+  dir: git-repo
+  path: bash
+  args:
+  - -exc
+  - |
+    fileprefix=$(printenv file_prefix)
+    echo "Building the code for Autosource MediaInfo, this operation will also restore the NuGet packages."
+
+    version=$(git describe --always | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+    filename=${fileprefix}-${version}.zip
+    cd ..
+    output_directory=${PWD}/artifacts
+
+    #echo "Run unit tests"
+    #cd git-repo/Solera.MediaInfo.Service.Test
+    #dotnet test -c release
+    #cd ..
+    #cd Solera.MediaInfo.Service
+
+    cd git-repo/Solera.MediaInfo.Service
+    dotnet publish -c release -o ./bin/Debug/netcoreapp2.1/publish
+    cd ..
+    mkdir -p ${PWD}/Solera.MediaInfo.Service/bin/Debug/netcoreapp2.1/publish/ci/pipelines
+    cp ${PWD}/ci/pipelines/manifest.yml ${PWD}/Solera.MediaInfo.Service/bin/Debug/netcoreapp2.1/publish/ci/pipelines
+    cd ${PWD}/Solera.MediaInfo.Service/bin/Debug/netcoreapp2.1/publish
+    zip -r ${output_directory}/${filename} ./*
+    
+ 
+  
