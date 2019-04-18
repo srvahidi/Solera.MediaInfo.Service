@@ -83,7 +83,11 @@ namespace Solera.MediaInfo.Service.Controllers
 
                     string imageUrl = $"{ _s3url}/{_s3bucket}{targetPath}/{file.FileName}";
                     Console.WriteLine($"Returned Url is {imageUrl}");
-                    return StatusCode(StatusCodes.Status200OK, imageUrl);
+                    return StatusCode(StatusCodes.Status200OK, new
+                    {
+                        IsSuccess = true,
+                        Data = imageUrl
+                    });
                 }
             }
             catch (Exception e)
