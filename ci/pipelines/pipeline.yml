@@ -144,7 +144,7 @@ resources:
 - name: teams-alert
   type: teams-notification
   source:
-    url: '' #((teams-webhook-url))
+    url: ((teams-webhook-url))
 
 #- name: project-metrics
   #type: project-metrics
