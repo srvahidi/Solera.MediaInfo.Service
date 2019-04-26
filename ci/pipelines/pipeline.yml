@@ -261,7 +261,7 @@ jobs:
     put: teams-alert
     params:
       title: |
-        $BUILD_PIPELINE_NAME Prod deployed successfully - Branch: ((branch-name))
+        $BUILD_PIPELINE_NAME Dev deployed successfully - Branch: ((branch-name))
       text: Job $BUILD_JOB_NAME successful.
       actionName: View Job $BUILD_JOB_NAME Results
       actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
@@ -321,7 +321,7 @@ jobs:
     put: teams-alert
     params:
       title: |
-        $BUILD_PIPELINE_NAME Prod deployed successfully - Branch: ((branch-name))
+        $BUILD_PIPELINE_NAME QA deployed successfully - Branch: ((branch-name))
       text: Job $BUILD_JOB_NAME successful.
       actionName: View Job $BUILD_JOB_NAME Results
       actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
