@@ -3,7 +3,6 @@
 platform: linux
 
 inputs:
-- name: git-repo
 - name: deployables
 
 run:
@@ -44,7 +43,7 @@ run:
 
     #download zip file
     set +x
-    curl -OL -k -u $artifactoryuser:$artifactorypass https://na-artifact-01.na.audatex.com:8443/artifactory/autosource/valuations-service/$artifact
+    curl -OL -k -u $artifactoryuser:$artifactorypass https://na-artifact-01.na.audatex.com:8443/artifactory/autosource/mediainfo-service/$artifact
     set -x
 
     #extract zip

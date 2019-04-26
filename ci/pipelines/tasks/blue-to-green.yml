@@ -1,11 +1,6 @@
 ---
 platform: linux
 
-
-inputs:
-- name: git-repo
-- name: metadata
-
 run:
   path: bash
   args:
@@ -14,7 +9,6 @@ run:
     set +x
     cfpass=$(printenv cf_deploy_password)
     cfuser=$(printenv cf_deploy_user)
-    build_id=$(cat metadata/build_id)
 
     cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
     set -x
@@ -35,4 +29,3 @@ run:
 
     # Rename Green app to Blue app.
     cf rename $cf_app_name-green $cf_app_name
-    curl -X POST -H 'Content-type: application/json' --data '{"title": "'${cf_space}' '${cf_app_name}' Blue-To-Green Switched","text": "[View Job Blue-To-Green Results](https://concourse-'${cf_env}'.gp2.axadmin.net/builds/'${build_id}')"}' ${teams_url}

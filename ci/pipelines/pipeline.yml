@@ -6,11 +6,6 @@ resource_types:
   source:
     repository: pivotalservices/artifactory-resource
     tag: latest
-    
-- name: metadata
-  type: docker-image
-  source:
-    repository: olhtbr/metadata-resource
 
 - name: teams-notification
   type: docker-image
@@ -42,7 +37,10 @@ resources:
     uri: ((bitbucket-uri))
     branch: ((branch-name))
     private_key: ((private-repo-key))
-    disable_ci_skip: true
+    ignore_paths:
+    - ci/pipelines/pipeline.yml
+    - ci/pipelines/demo/demo-pipeline.yml
+    - ci/pipelines/production/prod-pipeline.yml
     source: &dev-source
       cf_deploy_user: ((cf-preprd-username))
       cf_deploy_password: ((cf-preprd-password))
@@ -78,7 +76,7 @@ resources:
       autoscalepath: 'integration/integration-autoscale.json'
       autoscaleinsatancename: Autosource-Autoscaler
       memory: 256M
-      cf_api: https://api.system-dev.gp2.axadmin.net 
+      cf_api: https://api.system-dev.gp2.axadmin.net
       s3_access_key: BNDW1H4EWBFDJ36H61F3
       s3_bucket: rms-integration
       s3_secret_key: WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g
@@ -105,13 +103,13 @@ resources:
     private_key: ((private-repo-key))
     branch: ((branch-name))
     paths:
-      - ci/dotnet 
+      - ci/dotnet
 
 - name: artifacts
   type: artifactory
   source:
     endpoint: https://na-artifact-01.na.audatex.com:8443/artifactory
-    repository: /autosource/valuations-service
+    repository: /autosource/mediainfo-service
     regex: "mediainfosvc-(?<version>.*).zip"
     username: ((artifactory-username))
     password: ((artifactory-password))
@@ -135,7 +133,7 @@ resources:
 
 - name: cf-deploy
   type: cf-resource
-  source: 
+  source:
     api: ((cf-preprd-api))
     username: ((cf-preprd-username))
     password: ((cf-preprd-password))
@@ -156,9 +154,6 @@ resources:
     #sonartoken: ((sonar-auth-token))
     #tribelead: Christopher Klingler
 
-- name: metadata
-  type: metadata
-
 jobs:
 
 - name: build-dotnet-image
@@ -167,7 +162,7 @@ jobs:
     trigger: true
     version: every
   - put: dotnet-image
-    params: 
+    params:
       build: dotnet-dockerfile/ci/dotnet
 
 - name: build-utility-image
@@ -192,8 +187,8 @@ jobs:
   - get: dotnet-image
   - get: git-repo
     trigger: true
-    version: every   
-  
+    version: every
+
   - task: build-test
     image: dotnet-image
     file: git-repo/ci/pipelines/tasks/build.yml
@@ -213,10 +208,10 @@ jobs:
         #actionName: View Job $BUILD_JOB_NAME Results
         #actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   #plan:
-  #- get: git-repo    
+  #- get: git-repo
   #- get: artifacts
     #trigger: true
-    #passed: 
+    #passed:
        #- build-and-test-green
 
   #- task: execute-code-analysis
@@ -225,13 +220,13 @@ jobs:
       #branch: ((branch-name))
       #sonar-auth-token: ((sonar-auth-token))
       #sonar-url: ((sonar-url))
-          
+
   #ensure:
      #put: project-metrics
      #params:
        #sourcedir: git-repo
        #outputdir: analysis-output
-       #projectname: Mediainfo.Service-MIS  
+       #projectname: Mediainfo.Service-MIS
 
 - name: deploy-green-dev
   on_failure:
@@ -244,7 +239,7 @@ jobs:
       actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
   - get: utility-image
-  - get: git-repo      
+  - get: git-repo
   - get: artifacts
     version: every
     trigger: true
@@ -262,6 +257,14 @@ jobs:
       path: deployables
 
 - name: blue-green-switch-dev
+  on_success:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME Prod deployed successfully - Branch: ((branch-name))
+      text: Job $BUILD_JOB_NAME successful.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   on_failure:
     put: teams-alert
     params:
@@ -269,18 +272,17 @@ jobs:
         $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
       text: Job $BUILD_JOB_NAME failed.
       actionName: View Job $BUILD_JOB_NAME Results
-      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
   - get: utility-image
-  - get: metadata
   - get: git-repo
-    passed: 
+    passed:
      - deploy-green-dev
     trigger: true
   - task: blue-to-green
     image: utility-image
     file: git-repo/ci/pipelines/tasks/blue-to-green.yml
-    params: 
+    params:
       <<: *dev-source
 
 - name: deploy-green-qa
@@ -295,7 +297,7 @@ jobs:
   plan:
   - get: utility-image
   - get: git-repo
-    passed: 
+    passed:
      - blue-green-switch-dev
     trigger: false
   - task: prepare-manifest
@@ -312,9 +314,17 @@ jobs:
     image: utility-image
     file: git-repo/ci/pipelines/tasks/autoscale.yml
     params:
-      <<: *qa-source   
+      <<: *qa-source
 
 - name: blue-green-switch-qa
+  on_success:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME Prod deployed successfully - Branch: ((branch-name))
+      text: Job $BUILD_JOB_NAME successful.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   on_failure:
     put: teams-alert
     params:
@@ -322,18 +332,17 @@ jobs:
         $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
       text: Job $BUILD_JOB_NAME failed.
       actionName: View Job $BUILD_JOB_NAME Results
-      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
-  - get: metadata
   - get: utility-image
   - get: git-repo
-    passed: 
+    passed:
      - deploy-green-qa
     trigger: true
   - task: blue-to-green
     image: utility-image
     file: git-repo/ci/pipelines/tasks/blue-to-green.yml
-    params: 
+    params:
       <<: *qa-source
 
 groups:
@@ -354,4 +363,3 @@ groups:
   jobs:
   - build-dotnet-image
   - build-utility-image
-
