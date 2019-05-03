@@ -81,7 +81,7 @@ namespace Solera.MediaInfo.Service.Controllers
                         memStream.Length, _s3bucket, targetPath);
                     await fileTransferUtility.UploadAsync(fileTransferUtilityRequest);
 
-                    string imageUrl = $"{ _s3url}/{_s3bucket}{targetPath}/{file.FileName}";
+                    string imageUrl = $"{ _s3url}/{_s3bucket}/{targetPath}/{file.FileName}";
                     Console.WriteLine($"Returned Url is {imageUrl}");
                     return StatusCode(StatusCodes.Status200OK, new
                     {
