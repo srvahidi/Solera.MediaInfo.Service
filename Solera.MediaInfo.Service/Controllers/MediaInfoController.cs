@@ -62,7 +62,7 @@ namespace Solera.MediaInfo.Service.Controllers
                 IAmazonS3 _s3Client = new AmazonS3Client(_s3AccessKey, _s3SecretKey, config);
 
                 StringBuilder bucketPath = new StringBuilder();
-                bucketPath.Append(_s3bucket).Append(targetPath).ToString();
+                bucketPath.Append(_s3bucket).Append("/").Append(targetPath).ToString();
                 using (var memStream = new MemoryStream())
                 {
                     file.CopyTo(memStream);
