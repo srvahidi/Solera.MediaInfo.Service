@@ -186,7 +186,6 @@ jobs:
   - get: git-repo
     trigger: true
     version: every
-
   - task: build-test
     image: dotnet-image
     file: git-repo/ci/pipelines/tasks/build.yml
@@ -211,14 +210,12 @@ jobs:
     trigger: true
     passed:
        - build-and-test-green
-
   - task: execute-code-analysis
     file: git-repo/ci/pipelines/tasks/code-analysis.yml
     params:
       branch: ((branch-name))
       sonar-auth-token: ((sonar-auth-token))
       sonar-url: ((sonar-url))
-
   ensure:
      put: project-metrics
      params:
