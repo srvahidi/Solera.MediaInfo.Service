@@ -72,9 +72,7 @@ resources:
       cf_env: 'dev'
       cf_preceding_space: 'development'
       setautoscale: true
-      instance_number: 2
-      autoscalepath: 'integration/integration-autoscale.json'
-      autoscaleinsatancename: Autosource-Autoscaler
+      instance_number: 2      
       memory: 256M
       cf_api: https://api.system-dev.gp2.axadmin.net
       s3_access_key: BNDW1H4EWBFDJ36H61F3
@@ -146,13 +144,13 @@ resources:
   source:
     url: ((teams-webhook-url))
 
-#- name: project-metrics
-  #type: project-metrics
-  #source:
-    #jiraboard: Autosource.Mobile
-    #apiurl: https://projectmetrics-api-qa.apps-dev.gp2.axadmin.net
-    #sonartoken: ((sonar-auth-token))
-    #tribelead: Christopher Klingler
+- name: project-metrics
+  type: project-metrics
+  source:
+    jiraboard: Autosource.Mobile
+    apiurl: https://projectmetrics-api-qa.apps-dev.gp2.axadmin.net
+    sonartoken: ((sonar-auth-token))
+    tribelead: Christopher Klingler
 
 jobs:
 
@@ -198,35 +196,35 @@ jobs:
     params:
       file: artifacts/mediainfosvc-*.zip
 
-#- name: code-analysis-green
-  #on_failure:
-      #put: teams-alert
-      #params:
-        #title: |
-          #$BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
-        #text: Job $BUILD_JOB_NAME failed.
-        #actionName: View Job $BUILD_JOB_NAME Results
-        #actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
-  #plan:
-  #- get: git-repo
-  #- get: artifacts
-    #trigger: true
-    #passed:
-       #- build-and-test-green
+- name: code-analysis-green
+  on_failure:
+      put: teams-alert
+      params:
+        title: |
+          $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
+        text: Job $BUILD_JOB_NAME failed.
+        actionName: View Job $BUILD_JOB_NAME Results
+        actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - get: git-repo
+  - get: artifacts
+    trigger: true
+    passed:
+       - build-and-test-green
 
-  #- task: execute-code-analysis
-    #file: git-repo/ci/pipelines/tasks/code-analysis.yml
-    #params:
-      #branch: ((branch-name))
-      #sonar-auth-token: ((sonar-auth-token))
-      #sonar-url: ((sonar-url))
+  - task: execute-code-analysis
+    file: git-repo/ci/pipelines/tasks/code-analysis.yml
+    params:
+      branch: ((branch-name))
+      sonar-auth-token: ((sonar-auth-token))
+      sonar-url: ((sonar-url))
 
-  #ensure:
-     #put: project-metrics
-     #params:
-       #sourcedir: git-repo
-       #outputdir: analysis-output
-       #projectname: Mediainfo.Service-MIS
+  ensure:
+     put: project-metrics
+     params:
+       sourcedir: git-repo
+       outputdir: analysis-output
+       projectname: Mediainfo.Service-MIS
 
 - name: deploy-green-dev
   on_failure:
@@ -244,7 +242,7 @@ jobs:
     version: every
     trigger: true
     passed:
-     - build-and-test-green #code-analysis-green
+     - code-analysis-green
   - task: prepare-manifest
     image: utility-image
     file: git-repo/ci/pipelines/tasks/prepare-manifest.yml
@@ -310,11 +308,6 @@ jobs:
     file: git-repo/ci/pipelines/tasks/cfpush.yml
     params:
       <<: *qa-source
-  - task: auto-scale
-    image: utility-image
-    file: git-repo/ci/pipelines/tasks/autoscale.yml
-    params:
-      <<: *qa-source
 
 - name: blue-green-switch-qa
   on_success:
@@ -344,6 +337,33 @@ jobs:
     file: git-repo/ci/pipelines/tasks/blue-to-green.yml
     params:
       <<: *qa-source
+  - task: autoscaling
+    image: utility-image
+    params: 
+      <<: *qa-source 
+      artifactory_endpoint:  https://na-artifact-01.na.audatex.com:8443/artifactory
+      artifactory_username: ((artifactory-username))
+      artifactory_password: ((artifactory-password))   
+    config:
+      platform: linux
+      inputs:
+      - name: git-repo
+      run:
+        path: bash
+        args: 
+        - -exc
+        - |
+          set +x
+          cf login -u $cf_deploy_user -p $cf_deploy_password -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+          set -x
+          if [ $setautoscale == true ]; then
+            cf bind-service $cf_app_name autoscale
+            curl -O -k -u $artifactory_username:$artifactory_password $artifactory_endpoint/devops-local/cf-plugins/autoscaler-linux32-2.0.91
+            cf install-plugin autoscaler-linux32-2.0.91 -f
+            cf update-autoscaling-limits $cf_app_name 2 4
+            cf create-autoscaling-rule $cf_app_name cpu 25 75
+            cf enable-autoscaling $cf_app_name 
+          fi
 
 groups:
 
@@ -352,7 +372,7 @@ groups:
   - build-and-test-green
   - deploy-green-dev
   - blue-green-switch-dev
-  #- code-analysis-green
+  - code-analysis-green
 
 - name: mis-qa
   jobs:
