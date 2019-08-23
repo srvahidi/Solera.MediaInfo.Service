@@ -39,8 +39,8 @@ resources:
     private_key: ((private-repo-key))
     ignore_paths:
     - ci/pipelines/pipeline.yml
-    - ci/pipelines/demo/demo-pipeline.yml
-    - ci/pipelines/production/prod-pipeline.yml
+    - ci/pipelines/demo-pipeline.yml
+    - ci/pipelines/prod-pipeline.yml
     source: &dev-source
       cf_deploy_user: ((cf-preprd-username))
       cf_deploy_password: ((cf-preprd-password))
