@@ -15,6 +15,10 @@ using Newtonsoft.Json.Linq;
 using FluentAssertions;
 using Solera.MediaInfo.Service.Controllers;
 using Polly.Registry;
+using Solera.MediaInfo.Service.Helpers;
+using Polly;
+using System.Threading.Tasks;
+using Polly.Timeout;
 
 namespace Solera.MediaInfo.Service.Test
 {
@@ -25,18 +29,22 @@ namespace Solera.MediaInfo.Service.Test
         private MediaInfoController _sut;
         private Mock<HttpContext> _mockContext;
         private Mock<HttpRequest> _mockRequest;
-        private Mock<IAmazonS3> mockAmazonS3;
+        
         #endregion
 
         public MediaInfoControllerTest()
         {
             _mockRequest = new Mock<HttpRequest>();
             _mockContext = new Mock<HttpContext>();
-
+            Environment.SetEnvironmentVariable("S3_ACCESS_KEY", "BNDW1H4EWBFDJ36H61F3");
+            Environment.SetEnvironmentVariable("S3_SECRET_KEY", "WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g");
+            Environment.SetEnvironmentVariable("S3_URL", "https://s3.gp2.axadmin.net");
+            Environment.SetEnvironmentVariable("S3_BUCKET", "rms-development");
             _mockContext.Setup(c => c.Request).Returns(_mockRequest.Object);
-            Mock<IReadOnlyPolicyRegistry<string>> polyRegistry = new Mock<IReadOnlyPolicyRegistry<string>>();
-            _sut = new MediaInfoController(polyRegistry.Object);
-
+            Mock<IReadOnlyPolicyRegistry<string>> mockPolicyRegistry = new Mock<IReadOnlyPolicyRegistry<string>>();
+           mockPolicyRegistry.Setup(pol => pol.Get<IAsyncPolicy>("mbePolicy")).Returns(Policy.NoOpAsync());
+           _sut = new MediaInfoController(mockPolicyRegistry.Object);
+            
         }
         /// <summary>
         /// Post File to S3 on empty file name throws an exception an InternalServerError http status code is expected.
@@ -51,31 +59,18 @@ namespace Solera.MediaInfo.Service.Test
             Assert.Equal(StatusCodes.Status500InternalServerError, response.StatusCode);
         }
         /// <summary>
-        /// Post File to S3 on empty file name throws an exception an InternalServerError http status code is expected.
+        /// Post File to S3 on valid file name returns OK
         /// </summary>
         [Fact]
-        public async void PostFileToSoleraS3_OnFileName_Returns_ExpectError()
+        public async void PostFileToSoleraS3_OnFileName_Returns_ExpectSuccess()
         {
-            mockAmazonS3 = new Mock<IAmazonS3>();
-            mockAmazonS3.Setup(x => x.GetObjectAsync(
-       It.IsAny<string>(),
-       It.IsAny<string>(),
-       It.IsAny<CancellationToken>()))
-        .ReturnsAsync(
-            (string bucket, string key, CancellationToken ct) =>
-         new GetObjectResponse
-         {
-             BucketName = bucket,
-             Key = key,
-             HttpStatusCode = HttpStatusCode.OK
-
-         });
-
-            IFormFile formfile = GetPhotoIFormFile("TestPhoto01.jpg", "Hello World from a Fake File");
+           
+            IFormFile formfile = GetPhotoIFormFile("TestPhoto01.jpg", "A jpg file");
             var response = await _sut.PostFileToSoleraS3("Some file", formfile) as ObjectResult;
             Assert.NotNull(response);
             Assert.IsType<ObjectResult>(response);
-            response.Should().Equals("Error: No RegionEndpoint or ServiceURL configured");
+            Assert.Equal(StatusCodes.Status200OK, response.StatusCode);
+            response.Should().Equals("https://s3.gp2.axadmin.net/rms-development/Some file/TestPhoto01.jpg");
         }
         private static IFormFile GetPhotoIFormFile(string fileName, string fileContent)
         {
