@@ -12,6 +12,8 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Text;
+using Polly;
+using Polly.Registry;
 
 namespace Solera.MediaInfo.Service.Controllers
 {
@@ -25,14 +27,16 @@ namespace Solera.MediaInfo.Service.Controllers
         private readonly string _s3url;
         private readonly string _s3bucket;
         private const string NullEmptyArgumentMessage = "Cannot be null or empty.";
+        private readonly IReadOnlyPolicyRegistry<string> polyRegistry;
         #endregion
 
-        public MediaInfoController()
+        public MediaInfoController(IReadOnlyPolicyRegistry<string> polyRegistry)
         {
             _s3AccessKey = Environment.GetEnvironmentVariable("S3_ACCESS_KEY");
             _s3SecretKey = Environment.GetEnvironmentVariable("S3_SECRET_KEY");
             _s3url = Environment.GetEnvironmentVariable("S3_URL");
             _s3bucket = Environment.GetEnvironmentVariable("S3_BUCKET");
+            this.polyRegistry = polyRegistry;
         }
 
         /// <summary>
@@ -79,7 +83,11 @@ namespace Solera.MediaInfo.Service.Controllers
                     var fileTransferUtility = new TransferUtility(_s3Client);
                     Logging.LogInformation("POST S4 : The UploadAsync is invoked with memsetream length: {0}, S3 Bucket: {1}, S3 target file: {2}",
                         memStream.Length, _s3bucket, targetPath);
-                    await fileTransferUtility.UploadAsync(fileTransferUtilityRequest);
+                    var policyAsync = polyRegistry.Get<IAsyncPolicy>("mbePolicy");
+                    await policyAsync.ExecuteAsync(async () =>
+                    {
+                        await callFileTransfer(fileTransferUtility, fileTransferUtilityRequest);
+                    });
 
                     string imageUrl = $"{ _s3url}/{_s3bucket}/{targetPath}/{file.FileName}";
                     Console.WriteLine($"Returned Url is {imageUrl}");
@@ -100,6 +108,24 @@ namespace Solera.MediaInfo.Service.Controllers
                     Message = $"Error: {e.Message}"
                 });
             }
+
+        }
+        private async Task callFileTransfer(TransferUtility transferutility, TransferUtilityUploadRequest filetransferuploadrequest)
+        {
+            try
+            {
+                await transferutility.UploadAsync(filetransferuploadrequest);
+            }
+            catch (AmazonS3Exception ex)
+            {
+                throw ex;
+            }
+            catch (WebException ex)
+            {
+                throw ex;
+            }
+
+
         }
     }
 }

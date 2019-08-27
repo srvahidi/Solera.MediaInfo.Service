@@ -18,7 +18,11 @@
         "S3_URL": "https://s3.gp2.axadmin.net",
         "S3_SECRET_KEY": "WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g",
         "S3_BUCKET": "rms-development",
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "RESILIENCE_POLICY_MIN_WAIT_TIME_MSECS": "1000",
+        "RESILIENCE_POLICY_MAX_WAIT_TIME_MSECS": "20000",
+        "RESILIENCE_POLICY_MAX_RETRY_COUNT": "3"
+
       }
     },
     "Solera.MediaInfo.Service": {
