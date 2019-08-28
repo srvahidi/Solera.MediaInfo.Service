@@ -18,7 +18,7 @@ $Branch = (Get-ChildItem Env:Branch).value
 $ProjectName = (Get-ChildItem Env:Project-Name).value
 $OutputDir = -join ($pwd, "\analysis-output\")
 
-$testProject = -join($pwd,"\Solera.MediaInfo.Service.Test\Solera.MediaInfo.Service.Test.csproj")
+$testProject = -join($pwd,"\Solera.MediaInfo.Test\Solera.MediaInfo.Test.csproj")
 
 
 
@@ -42,7 +42,7 @@ try {
 
     Write-Output "INFO: Running dotcover for unit tests project. All output is muted."
 	Write-Output "$testProject"
-    Invoke-Expression "$dotCoverExe cover /TargetExecutable='$dotnetExe' /ReturnTargetExitCode /TargetArguments='test .\Solera.MediaInfo.Service.Test\Solera.MediaInfo.Service.Test.csproj' /Output=$unitTestsNS.dcvr"
+    Invoke-Expression "$dotCoverExe cover /TargetExecutable='$dotnetExe' /ReturnTargetExitCode /TargetArguments='test .\Solera.MediaInfo.Test\Solera.MediaInfo.Test.csproj' /Output=$unitTestsNS.dcvr"
     $testsCode = $LASTEXITCODE
     if($testsCode -lt 0){
         Write-Output "ERROR: Unit and integration tests failed."
