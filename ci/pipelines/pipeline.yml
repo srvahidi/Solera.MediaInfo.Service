@@ -55,6 +55,9 @@ resources:
       s3_bucket: rms-development
       s3_secret_key: WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g
       s3_url: https://s3.gp2.axadmin.net
+      resilience_policy_min_wait_time_msecs: 1000
+      resilience_policy_max_wait_time_msecs: 20000
+      resilience_policy_max_retry_count: 3
       cf_organization: mobile_backend
       teams_url: ((teams-webhook-url))
       newrelic_app_lic: ''
@@ -79,6 +82,9 @@ resources:
       s3_bucket: rms-integration
       s3_secret_key: WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g
       s3_url: https://s3.gp2.axadmin.net
+      resilience_policy_min_wait_time_msecs: 1000
+      resilience_policy_max_wait_time_msecs: 20000
+      resilience_policy_max_retry_count: 3
       cf_organization: mobile_backend
       teams_url: ((teams-webhook-url))
       newrelic_app_lic: ((new-relic-license-key))
