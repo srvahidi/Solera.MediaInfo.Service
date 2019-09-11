@@ -26,21 +26,17 @@ namespace Solera.MediaInfo.Service.Controllers
     public class MediaInfoController : ControllerBase
     {
         #region Private members
-        private readonly string _s3AccessKey;
-        private readonly string _s3SecretKey;
-        private readonly string _s3url;
         private readonly string _s3bucket;
+        private readonly IAmazonS3 _s3Client;
         private const string NullEmptyArgumentMessage = "Cannot be null or empty.";
         private readonly IReadOnlyPolicyRegistry<string> polyRegistry;
         private readonly ILogger _logger;
         #endregion
 
-        public MediaInfoController(IReadOnlyPolicyRegistry<string> polyRegistry, ILogger<MediaInfoController> logger)
+        public MediaInfoController(IReadOnlyPolicyRegistry<string> polyRegistry, IAmazonS3 s3Client, ILogger<MediaInfoController> logger)
         {
             _logger = logger;
-            _s3AccessKey = Environment.GetEnvironmentVariable("S3_ACCESS_KEY");
-            _s3SecretKey = Environment.GetEnvironmentVariable("S3_SECRET_KEY");
-            _s3url = Environment.GetEnvironmentVariable("S3_URL");
+            _s3Client = s3Client;
             _s3bucket = Environment.GetEnvironmentVariable("S3_BUCKET");
             this.polyRegistry = polyRegistry;
         }
@@ -54,11 +50,7 @@ namespace Solera.MediaInfo.Service.Controllers
         [Consumes("multipart/form-data")]
         [HttpPost("file")]
         public async Task<object> PostFileToSoleraS3(UploadFileRequest uploadFileRequest)
-        {
-            AmazonS3Config config = new AmazonS3Config();
-            config.ServiceURL = _s3url;
-            IAmazonS3 _s3Client = new AmazonS3Client(_s3AccessKey, _s3SecretKey, config);
-
+        {          
             StringBuilder bucketPath = new StringBuilder();
             bucketPath.Append(_s3bucket).Append("/").Append(uploadFileRequest.TargetPath).ToString();
             using (var memStream = new MemoryStream())
@@ -83,7 +75,7 @@ namespace Solera.MediaInfo.Service.Controllers
                     await callFileTransfer(fileTransferUtility, fileTransferUtilityRequest);
                 });
 
-                string imageUrl = $"{ _s3url}/{_s3bucket}/{uploadFileRequest.TargetPath}/{uploadFileRequest.File.FileName}";
+                string imageUrl = $"{_s3Client.Config.ServiceURL}/{_s3bucket}/{uploadFileRequest.TargetPath}/{uploadFileRequest.File.FileName}";
                 Console.WriteLine($"Returned Url is {imageUrl}");
                 return StatusCode(StatusCodes.Status200OK, new
                 {
@@ -120,11 +112,7 @@ namespace Solera.MediaInfo.Service.Controllers
         [HttpDelete]
         public async Task<object> DeleteFileFromSoleraS3(DeleteFileRequest deleteFileRequest)
         {
-            _logger.LogInformation($"{JsonConvert.SerializeObject(deleteFileRequest)}");
-            AmazonS3Config config = new AmazonS3Config();
-            config.ServiceURL = _s3url;
-            IAmazonS3 _s3Client = new AmazonS3Client(_s3AccessKey, _s3SecretKey, config);
-
+            _logger.LogInformation($"{JsonConvert.SerializeObject(deleteFileRequest)}");           
             DeleteObjectsRequest request = new DeleteObjectsRequest();
             request.BucketName = _s3bucket;
             request.Objects = deleteFileRequest.Body.TargetPaths.Select(t => new KeyVersion() { Key = t }).ToList();
