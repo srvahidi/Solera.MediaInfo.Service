@@ -119,7 +119,7 @@ namespace Solera.MediaInfo.Service.Controllers
             try
             {
                 var response = await _s3Client.DeleteObjectsAsync(request);
-                var message = $"Successfully deleted {request.Objects.Count} item(s)";
+                var message = $"Successfully deleted {response.DeletedObjects.Count} item(s)";
                 _logger.LogInformation(message);
                 return StatusCode((int)response.HttpStatusCode,
                     new Response<string>(
