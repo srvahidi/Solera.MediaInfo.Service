@@ -7,7 +7,7 @@ namespace Solera.MediaInfo.Service.Models
     [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
     public class Response<T> where T : class
     {
-        public Response(bool isSuccess, int statusCode, T data = null, string message = null, Error[] errors = null)
+        public Response(bool isSuccess, int? statusCode, T data = null, string message = null, Error[] errors = null)
         {
             IsSuccess = isSuccess;
             StatusCode = statusCode;

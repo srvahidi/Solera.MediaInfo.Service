@@ -77,11 +77,8 @@ namespace Solera.MediaInfo.Service.Controllers
 
                 string imageUrl = $"{_s3Client.Config.ServiceURL}/{_s3bucket}/{uploadFileRequest.TargetPath}/{uploadFileRequest.File.FileName}";
                 Console.WriteLine($"Returned Url is {imageUrl}");
-                return StatusCode(StatusCodes.Status200OK, new
-                {
-                    IsSuccess = true,
-                    Data = imageUrl
-                });
+                // TODO: check if returning the StatusCode property does not break MIOS
+                return StatusCode(StatusCodes.Status200OK, new Response<string>(true, null, imageUrl));
             }
         }
 
@@ -115,7 +112,8 @@ namespace Solera.MediaInfo.Service.Controllers
             _logger.LogInformation($"{JsonConvert.SerializeObject(deleteFileRequest)}");           
             DeleteObjectsRequest request = new DeleteObjectsRequest();
             request.BucketName = _s3bucket;
-            request.Objects = deleteFileRequest.Body.TargetPaths.Select(t => new KeyVersion() { Key = t }).ToList();
+            string basePath = $"{_s3Client.Config.ServiceURL}/{_s3bucket}/";
+            request.Objects = deleteFileRequest.Body.TargetPaths.Select(t => new KeyVersion() { Key = RemoveHostAndBucketName(basePath, t) }).ToList();
             try
             {
                 var response = await _s3Client.DeleteObjectsAsync(request);
@@ -132,6 +130,18 @@ namespace Solera.MediaInfo.Service.Controllers
                 var response = GetErrorResponse(e);
                 return StatusCode(StatusCodes.Status500InternalServerError, response);
             }
+        }
+
+        private string RemoveHostAndBucketName(string basePath, string targetPath)
+        {
+            var result = targetPath;
+            if (targetPath.StartsWith(basePath))
+            {
+                // skip "/" and bucket name (e.g. "rms-development/")
+                var uriBuilder = new UriBuilder(targetPath);
+                result = string.Concat(uriBuilder.Uri.Segments.Skip(2));
+            }
+            return result;
         }
 
         private Response<string> GetErrorResponse(DeleteObjectsException e)

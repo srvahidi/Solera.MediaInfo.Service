@@ -13,6 +13,14 @@ namespace Solera.MediaInfo.Service.Models
         {
             if (Body.TargetPaths.Length == 0)
                 yield return new ValidationResult("Must contain at least one target path.", new[] { nameof(Body.TargetPaths) });
+
+            foreach (var path in Body.TargetPaths)
+            {
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    yield return new ValidationResult("Must not contain an empty target path.", new[] { nameof(Body.TargetPaths) });
+                }
+            }
         }
     }
 

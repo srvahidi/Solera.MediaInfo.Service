@@ -2,7 +2,6 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using AutoFixture;
-using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -28,16 +27,25 @@ namespace Solera.MediaInfo.Service.Test
         private readonly Mock<ILogger<MediaInfoController>> _mocklogger;
         private readonly Mock<IAmazonS3> _mockS3Client;
         private readonly Fixture _fixture;
+        private const string HOST = "http://testhost.net";
+        private const string BUCKET = "testbucket";
         #endregion
 
         public MediaInfoControllerTest()
         {
             _fixture = new Fixture();
-            Environment.SetEnvironmentVariable("S3_BUCKET", _fixture.Create("S3_BUCKET"));
+            Environment.SetEnvironmentVariable("S3_BUCKET", BUCKET);
             Mock<IReadOnlyPolicyRegistry<string>> mockPolicyRegistry = new Mock<IReadOnlyPolicyRegistry<string>>();
-           mockPolicyRegistry.Setup(pol => pol.Get<IAsyncPolicy>("mbePolicy")).Returns(Policy.NoOpAsync());            
+            mockPolicyRegistry.Setup(pol => pol.Get<IAsyncPolicy>("mbePolicy")).Returns(Policy.NoOpAsync());
             _mocklogger = new Mock<ILogger<MediaInfoController>>();
+            var mockConfig = new Mock<IClientConfig>();
+            mockConfig.SetupGet(_ => _.ServiceURL)
+                .Returns(HOST)
+                .Verifiable();
             _mockS3Client = new Mock<IAmazonS3>();
+            _mockS3Client.SetupGet(_ => _.Config)
+                 .Returns(mockConfig.Object)
+                 .Verifiable();         
             _sut = new MediaInfoController(mockPolicyRegistry.Object, _mockS3Client.Object, _mocklogger.Object);
         }
 
@@ -49,23 +57,20 @@ namespace Solera.MediaInfo.Service.Test
         public async void PostFileToSoleraS3_OnFileName_Returns_ExpectSuccess()
         {
             // Arrange
-            var mockConfig = new Mock<IClientConfig>();
-            mockConfig.SetupGet(_ => _.ServiceURL)
-                .Returns(_fixture.Create("https://url"))
-                .Verifiable();
-            _mockS3Client.SetupGet(_ => _.Config)
-                 .Returns(mockConfig.Object)
-                 .Verifiable();
-            IFormFile formfile = GetPhotoIFormFile("TestPhoto01.jpg", "A jpg file");
+            var targetPath = _fixture.Create("target path");
+            var fileName = _fixture.Create("file name");
+            IFormFile formfile = GetPhotoIFormFile(fileName, _fixture.Create("file content"));
 
             // Act
-            var response = await _sut.PostFileToSoleraS3(new UploadFileRequest() { TargetPath = "Some file", File = formfile }) as ObjectResult;
+            var postFileResponse = await _sut.PostFileToSoleraS3(new UploadFileRequest() { TargetPath = targetPath, File = formfile }) as ObjectResult;
 
             // Assert
-            Assert.NotNull(response);
-            Assert.IsType<ObjectResult>(response);
-            Assert.Equal(StatusCodes.Status200OK, response.StatusCode);
-            response.Should().Equals("https://s3.gp2.axadmin.net/rms-development/Some file/TestPhoto01.jpg");
+            Assert.NotNull(postFileResponse);
+            Assert.IsType<ObjectResult>(postFileResponse);
+            Assert.Equal(StatusCodes.Status200OK, postFileResponse.StatusCode);
+            var response = (Response<string>)postFileResponse.Value;
+            Assert.True(response.IsSuccess);
+            Assert.Equal($"{HOST}/{BUCKET}/{targetPath}/{fileName}", response.Data);
         }
         #endregion
 
@@ -75,7 +80,13 @@ namespace Solera.MediaInfo.Service.Test
         public async void DeletePhotoEndpoint_Returns_SuccessResponse()
         {
             // Arrange
-            var deleteFileRequest = _fixture.Create<DeleteFileRequest>();
+            var deleteFileRequest = new DeleteFileRequest()
+            {
+                Body = new RemoveFileBody()
+                {
+                    TargetPaths = _fixture.CreateMany($"{HOST}/{BUCKET}/", 3).ToArray()
+                }
+            };
             var s3ClientResponse = new DeleteObjectsResponse()
             {
                 HttpStatusCode = HttpStatusCode.OK,
@@ -109,7 +120,13 @@ namespace Solera.MediaInfo.Service.Test
         public async void DeletePhotoEndpoint_Returns_500_When_S3ClientThrowsException()
         {
             // Arrange
-            var deleteFileRequest = _fixture.Create<DeleteFileRequest>();
+            var deleteFileRequest = new DeleteFileRequest()
+            {
+                Body = new RemoveFileBody()
+                {
+                    TargetPaths = _fixture.CreateMany($"{HOST}/{BUCKET}/", 3).ToArray()
+                }
+            };
             var s3ClientResponse = new DeleteObjectsResponse()
             {
                 HttpStatusCode = HttpStatusCode.InternalServerError,
