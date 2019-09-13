@@ -68,7 +68,7 @@ namespace Solera.MediaInfo.Service.Controllers
                 };
 
                 var fileTransferUtility = _transferUtilitySimpleFactory.Create(_s3Client);
-                Logging.LogInformation("POST S4 : The UploadAsync is invoked with memsetream length: {0}, S3 Bucket: {1}, S3 target file: {2}",
+                _logger.LogInformation("POST S4 : The UploadAsync is invoked with memsetream length: {0}, S3 Bucket: {1}, S3 target file: {2}",
                     memStream.Length, _s3bucket, uploadFileRequest.TargetPath);
                 var policyAsync = polyRegistry.Get<IAsyncPolicy>("mbePolicy");
                 await policyAsync.ExecuteAsync(async () =>
@@ -77,7 +77,7 @@ namespace Solera.MediaInfo.Service.Controllers
                 });
 
                 string imageUrl = $"{_s3Client.Config.ServiceURL}/{_s3bucket}/{uploadFileRequest.TargetPath}/{uploadFileRequest.File.FileName}";
-                Console.WriteLine($"Returned Url is {imageUrl}");
+                _logger.LogInformation($"Returned Url is {imageUrl}");
                 // TODO: check if returning the StatusCode property does not break MIOS
                 return StatusCode(StatusCodes.Status200OK, new Response<string>(true, null, imageUrl));
             }
