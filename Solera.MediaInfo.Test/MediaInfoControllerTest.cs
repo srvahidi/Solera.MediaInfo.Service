@@ -1,6 +1,7 @@
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Amazon.S3.Transfer;
 using AutoFixture;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -9,10 +10,10 @@ using Moq;
 using Polly;
 using Polly.Registry;
 using Solera.MediaInfo.Service.Controllers;
+using Solera.MediaInfo.Service.Helpers;
 using Solera.MediaInfo.Service.Models;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -27,6 +28,7 @@ namespace Solera.MediaInfo.Service.Test
         private MediaInfoController _sut;
         private readonly Mock<ILogger<MediaInfoController>> _mocklogger;
         private readonly Mock<IAmazonS3> _mockS3Client;
+        private readonly Mock<ITransferUtility> _mockTransferUtility;
         private readonly Fixture _fixture;
         private const string HOST = "http://testhost.net";
         private const string BUCKET = "testbucket";
@@ -46,8 +48,12 @@ namespace Solera.MediaInfo.Service.Test
             _mockS3Client = new Mock<IAmazonS3>();
             _mockS3Client.SetupGet(_ => _.Config)
                  .Returns(mockConfig.Object)
-                 .Verifiable();         
-            _sut = new MediaInfoController(mockPolicyRegistry.Object, _mockS3Client.Object, _mocklogger.Object);
+                 .Verifiable();
+            _mockTransferUtility = new Mock<ITransferUtility>();
+            var mockTransferUtilitySimpleFactory = new Mock<ITransferUtilitySimpleFactory>();
+            mockTransferUtilitySimpleFactory.Setup(_ => _.Create(It.IsAny<IAmazonS3>()))
+                .Returns(_mockTransferUtility.Object);
+            _sut = new MediaInfoController(mockPolicyRegistry.Object, _mockS3Client.Object, mockTransferUtilitySimpleFactory.Object, _mocklogger.Object);
         }
 
         #region PostPhotoEndpoint
@@ -69,6 +75,29 @@ namespace Solera.MediaInfo.Service.Test
             var response = (Response<string>)postFileResponse.Value;
             Assert.True(response.IsSuccess);
             Assert.Equal($"{HOST}/{BUCKET}/{targetPath}/{fileName}", response.Data);
+        }
+
+        [Theory]
+        [MemberData(nameof(GetExceptions))]
+        public async void PostFileToSoleraS3_Should_ThrowException_When_ErrorFromTransferUtility(Exception exception)
+        {
+            // Arrange
+            var targetPath = _fixture.Create("target path");
+            var fileName = _fixture.Create("file name");
+            IFormFile formfile = GetPhotoIFormFile(fileName, _fixture.Create("file content"));
+
+            _mockTransferUtility.Setup(_ => _.UploadAsync(
+                It.IsAny<TransferUtilityUploadRequest>(),
+                It.IsAny<CancellationToken>()))
+                .ThrowsAsync(exception);
+
+            // Act
+            var result = await Assert.ThrowsAsync(exception.GetType(), async () =>
+                await _sut.PostFileToSoleraS3(new UploadFileRequest() { TargetPath = targetPath, File = formfile }));
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.NotEmpty(result.Message);
         }
         #endregion
 
@@ -173,6 +202,16 @@ namespace Solera.MediaInfo.Service.Test
             mockFile.Setup(f => f.Length).Returns(ms.Length);
             mockFile.Setup(f => f.ContentType).Returns("image/jpeg");
             return mockFile.Object;
+        }
+
+        public static IEnumerable<object[]> GetExceptions()
+        {
+            var allData = new List<object[]>
+            {
+                new object[] { new AmazonS3Exception(new Exception())},
+                new object[] { new WebException() },
+            };
+            return allData;
         }
         #endregion
     }
