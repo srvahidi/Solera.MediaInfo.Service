@@ -28,7 +28,6 @@ namespace Solera.MediaInfo.Service.Controllers
         #region Private members
         private readonly string _s3bucket;
         private readonly IAmazonS3 _s3Client;
-        private const string NullEmptyArgumentMessage = "Cannot be null or empty.";
         private readonly IReadOnlyPolicyRegistry<string> polyRegistry;
         private readonly ILogger _logger;
         #endregion
@@ -90,11 +89,13 @@ namespace Solera.MediaInfo.Service.Controllers
             }
             catch (AmazonS3Exception ex)
             {
-                throw ex;
+                _logger.LogError(ex, $"Error when uploading {filetransferuploadrequest.Key}");
+                throw;
             }
             catch (WebException ex)
             {
-                throw ex;
+                _logger.LogError(ex, $"Error when uploading {filetransferuploadrequest.Key}");
+                throw;
             }
 
 
