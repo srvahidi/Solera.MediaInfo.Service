@@ -30,12 +30,14 @@ namespace Solera.MediaInfo.Service.Controllers
         private readonly IAmazonS3 _s3Client;
         private readonly IReadOnlyPolicyRegistry<string> polyRegistry;
         private readonly ILogger _logger;
+        private readonly ITransferUtilitySimpleFactory _transferUtilitySimpleFactory;
         #endregion
 
-        public MediaInfoController(IReadOnlyPolicyRegistry<string> polyRegistry, IAmazonS3 s3Client, ILogger<MediaInfoController> logger)
+        public MediaInfoController(IReadOnlyPolicyRegistry<string> polyRegistry, IAmazonS3 s3Client, ITransferUtilitySimpleFactory transferUtilitySimpleFactory, ILogger<MediaInfoController> logger)
         {
             _logger = logger;
             _s3Client = s3Client;
+            _transferUtilitySimpleFactory = transferUtilitySimpleFactory;
             _s3bucket = Environment.GetEnvironmentVariable("S3_BUCKET");
             this.polyRegistry = polyRegistry;
         }
@@ -65,7 +67,7 @@ namespace Solera.MediaInfo.Service.Controllers
                     CannedACL = S3CannedACL.PublicRead
                 };
 
-                var fileTransferUtility = new TransferUtility(_s3Client);
+                var fileTransferUtility = _transferUtilitySimpleFactory.Create(_s3Client);
                 Logging.LogInformation("POST S4 : The UploadAsync is invoked with memsetream length: {0}, S3 Bucket: {1}, S3 target file: {2}",
                     memStream.Length, _s3bucket, uploadFileRequest.TargetPath);
                 var policyAsync = polyRegistry.Get<IAsyncPolicy>("mbePolicy");
@@ -81,7 +83,7 @@ namespace Solera.MediaInfo.Service.Controllers
             }
         }
 
-        private async Task callFileTransfer(TransferUtility transferutility, TransferUtilityUploadRequest filetransferuploadrequest)
+        private async Task callFileTransfer(ITransferUtility transferutility, TransferUtilityUploadRequest filetransferuploadrequest)
         {
             try
             {

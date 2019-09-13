@@ -1,23 +1,12 @@
-using Amazon.Runtime;
-using Amazon.S3;
-using Amazon.S3.Model;
-using AutoFixture;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Newtonsoft.Json;
-using Polly;
-using Polly.Registry;
-using Solera.MediaInfo.Service.Controllers;
 using Solera.MediaInfo.Service.Middleware;
 using Solera.MediaInfo.Service.Models;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Net;
-using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Solera.MediaInfo.Service.Test
@@ -36,6 +25,22 @@ namespace Solera.MediaInfo.Service.Test
             _mockRequestDelegate = new Mock<RequestDelegate>();            
             _mockLogger = new Mock<ILogger<ExceptionMiddleware>>();
             _sut = new ExceptionMiddleware(_mockRequestDelegate.Object, _mockLogger.Object);
+        }
+
+        [Fact]
+        public async void InvokeAsync_Should_CallNextAndComplete()
+        {
+            // Arrange
+            var context = new DefaultHttpContext();
+            _mockRequestDelegate.Setup(next => next(It.IsAny<HttpContext>()))
+                .Returns(Task.CompletedTask)
+                .Verifiable();
+
+            // Act
+            await _sut.InvokeAsync(context);
+
+            // Assert
+            _mockRequestDelegate.Verify();
         }
 
         [Fact]

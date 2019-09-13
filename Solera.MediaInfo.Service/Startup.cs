@@ -32,6 +32,7 @@ namespace Solera.MediaInfo.Service
             services.TryAddSingleton<IReadOnlyPolicyRegistry<string>, ResiliencePolicyRegistry>();
             services.AddCloudFoundryActuators(Configuration);
             services.AddScoped<ValidateModelAttribute>();
+            services.AddTransient<ITransferUtilitySimpleFactory, TransferUtilitySimpleFactory>();
             var awsOptions = Configuration.GetAWSOptions("S3");
             awsOptions.Credentials = new EnvironmentVariablesS3Credentials();
             services.AddDefaultAWSOptions(awsOptions);
