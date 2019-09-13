@@ -5,10 +5,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Solera.MediaInfo.Service\**" />
+    <Content Remove="Solera.MediaInfo.Service\**" />
+    <EmbeddedResource Remove="Solera.MediaInfo.Service\**" />
+    <None Remove="Solera.MediaInfo.Service\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="wwwroot\" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.3.100.1" />
     <PackageReference Include="AWSSDK.S3" Version="3.3.31.11" />
     <PackageReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="2.1.1" />
