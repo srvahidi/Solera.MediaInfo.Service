@@ -12,6 +12,7 @@ using Solera.MediaInfo.Service.Controllers;
 using Solera.MediaInfo.Service.Models;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -50,11 +51,8 @@ namespace Solera.MediaInfo.Service.Test
         }
 
         #region PostPhotoEndpoint
-        /// <summary>
-        /// Post File to S3 on valid file name returns OK
-        /// </summary>
         [Fact]
-        public async void PostFileToSoleraS3_OnFileName_Returns_ExpectSuccess()
+        public async void PostFileToSoleraS3_Returns_Success()
         {
             // Arrange
             var targetPath = _fixture.Create("target path");
