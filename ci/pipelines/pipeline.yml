@@ -87,7 +87,7 @@ resources:
       resilience_policy_max_retry_count: 3
       cf_organization: mobile_backend
       teams_url: ((teams-webhook-url))
-      newrelic_app_lic: ((new-relic-license-key))
+      newrelic_app_lic: ''
       buildpack_one: '- newrelic_dotnet_core_buildpack'
       buildpack_two: '- dotnet_core_buildpack'
 
