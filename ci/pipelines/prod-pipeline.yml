@@ -25,7 +25,7 @@ resources:
       cf_space: demo #'production'
       cf_env: 'prod'
       cf_preceding_space: integration #required until we start deploying the app in prod
-      cf_preceding_appname: mis-demo #mavs-demo
+      cf_preceding_appname: mis-int1 #mis-demo
       cf_preceding_env: dev
       cf_dev_password: ((cf-dev-deploy-password)) #required until we start deploying the app in prod
       cf_dev_user: ((cf-dev-deploy-user)) #required until we start deploying the app in prod            
