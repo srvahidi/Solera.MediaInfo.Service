@@ -35,7 +35,7 @@ resources:
       cf_api: https://api.system-prod.gp2.axadmin.net
       aspnetcore_environment: Production
       s3_access_key: EIFNLJ0J8IOQ21M9YVO3
-      s3_bucket: rms-demo
+      s3_bucket: rms-prod
       s3_secret_key: AJ2k9MmjbHFnLzEawimFUzasOxp68RirLxH2OuNa
       s3_url: https://s3.gp2.axadmin.net
       resilience_policy_min_wait_time_msecs: 1000
