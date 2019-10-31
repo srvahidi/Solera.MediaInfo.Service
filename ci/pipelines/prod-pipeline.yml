@@ -20,15 +20,13 @@ resources:
       cf_deploy_password: ((cf-prd-password))      
       artifactory-username: ((artifactory-username))
       artifactory-password: ((artifactory-password))
-      cf_app_name: mis-pilot
+      cf_app_name: mis-prod
       file_prefix: 'mediainfosvc'
-      cf_space: demo #'production'
+      cf_space: 'production'
       cf_env: 'prod'
-      cf_preceding_space: integration #required until we start deploying the app in prod
-      cf_preceding_appname: mis-int1 #mis-demo
-      cf_preceding_env: dev
-      cf_dev_password: ((cf-dev-deploy-password)) #required until we start deploying the app in prod
-      cf_dev_user: ((cf-dev-deploy-user)) #required until we start deploying the app in prod            
+      cf_preceding_space: demo
+      cf_preceding_appname: mis-demo
+      cf_preceding_env: dev          
       instance_number: 2
       memory: 512M
       setautoscale: true
