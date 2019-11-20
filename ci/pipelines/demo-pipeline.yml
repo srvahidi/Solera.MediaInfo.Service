@@ -24,8 +24,8 @@ resources:
       file_prefix: 'mediainfosvc'
       cf_space: 'demo'
       cf_env: 'prod'
-      cf_preceding_space: integration
-      cf_preceding_appname: mis-int1
+      cf_preceding_space: pcpm
+      cf_preceding_appname: mis-pcpm
       cf_preceding_env: dev
       cf_dev_password: ((cf-dev-deploy-password))
       cf_dev_user: ((cf-dev-deploy-user))

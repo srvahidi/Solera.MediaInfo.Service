@@ -1,5 +1,83 @@
 # this is dev and qa pipeline for Mediainfo Service
 ---
+
+source: &dev-source
+      cf_deploy_user: ((cf-preprd-username))
+      cf_deploy_password: ((cf-preprd-password))
+      cf_app_name: mis-dev
+      file_prefix: 'mediainfosvc'
+      cf_space: 'development'
+      cf_env: 'dev'
+      instance_number: 1
+      memory: 256M
+      cf_api: https://api.system-dev.gp2.axadmin.net
+      s3_access_key: BNDW1H4EWBFDJ36H61F3
+      s3_bucket: rms-development
+      s3_secret_key: WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g
+      s3_url: https://s3.gp2.axadmin.net
+      resilience_policy_min_wait_time_msecs: 1000
+      resilience_policy_max_wait_time_msecs: 20000
+      resilience_policy_max_retry_count: 3
+      cf_organization: mobile_backend
+      teams_url: ((teams-webhook-url))
+      newrelic_app_lic: ''
+      buildpack_one: ''
+      buildpack_two: '- dotnet_core_buildpack'
+source: &qa-source
+      cf_deploy_user: ((cf-preprd-username))
+      cf_deploy_password: ((cf-preprd-password))
+      artifactory-username: ((artifactory-username))
+      artifactory-password: ((artifactory-password))
+      cf_app_name: mis-int1
+      file_prefix: 'mediainfosvc'
+      cf_preceding_appname: mis-dev
+      cf_space: 'integration'
+      cf_env: 'dev'
+      cf_preceding_space: 'development'
+      setautoscale: true
+      instance_number: 2      
+      memory: 256M
+      cf_api: https://api.system-dev.gp2.axadmin.net
+      s3_access_key: BNDW1H4EWBFDJ36H61F3
+      s3_bucket: rms-integration
+      s3_secret_key: WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g
+      s3_url: https://s3.gp2.axadmin.net
+      resilience_policy_min_wait_time_msecs: 1000
+      resilience_policy_max_wait_time_msecs: 20000
+      resilience_policy_max_retry_count: 3
+      cf_organization: mobile_backend
+      teams_url: ((teams-webhook-url))
+      newrelic_app_lic: ''
+      buildpack_one: '- newrelic_dotnet_core_buildpack_latest'
+      buildpack_two: '- dotnet_core_buildpack'
+source: &pcpm-source
+      cf_deploy_user: ((cf-preprd-username))
+      cf_deploy_password: ((cf-preprd-password))
+      artifactory-username: ((artifactory-username))
+      artifactory-password: ((artifactory-password))
+      cf_app_name: mis-pcpm
+      file_prefix: 'mediainfosvc'
+      cf_preceding_appname: mis-int1
+      cf_space: 'pcpm'
+      cf_env: 'dev'
+      cf_preceding_space: 'integration'
+      setautoscale: true
+      instance_number: 2      
+      memory: 256M
+      cf_api: https://api.system-dev.gp2.axadmin.net
+      s3_access_key: BNDW1H4EWBFDJ36H61F3
+      s3_bucket: rms-pcpm
+      s3_secret_key: WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g
+      s3_url: https://s3.gp2.axadmin.net
+      resilience_policy_min_wait_time_msecs: 1000
+      resilience_policy_max_wait_time_msecs: 20000
+      resilience_policy_max_retry_count: 3
+      cf_organization: mobile_backend
+      teams_url: ((teams-webhook-url))
+      newrelic_app_lic: ''
+      buildpack_one: '- newrelic_dotnet_core_buildpack_latest'
+      buildpack_two: '- dotnet_core_buildpack'
+
 resource_types:
 - name: artifactory
   type: docker-image
@@ -40,56 +118,7 @@ resources:
     ignore_paths:
     - ci/pipelines/pipeline.yml
     - ci/pipelines/demo-pipeline.yml
-    - ci/pipelines/prod-pipeline.yml
-    source: &dev-source
-      cf_deploy_user: ((cf-preprd-username))
-      cf_deploy_password: ((cf-preprd-password))
-      cf_app_name: mis-dev
-      file_prefix: 'mediainfosvc'
-      cf_space: 'development'
-      cf_env: 'dev'
-      instance_number: 1
-      memory: 256M
-      cf_api: https://api.system-dev.gp2.axadmin.net
-      s3_access_key: BNDW1H4EWBFDJ36H61F3
-      s3_bucket: rms-development
-      s3_secret_key: WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g
-      s3_url: https://s3.gp2.axadmin.net
-      resilience_policy_min_wait_time_msecs: 1000
-      resilience_policy_max_wait_time_msecs: 20000
-      resilience_policy_max_retry_count: 3
-      cf_organization: mobile_backend
-      teams_url: ((teams-webhook-url))
-      newrelic_app_lic: ''
-      buildpack_one: ''
-      buildpack_two: '- dotnet_core_buildpack'
-    source: &qa-source
-      cf_deploy_user: ((cf-preprd-username))
-      cf_deploy_password: ((cf-preprd-password))
-      artifactory-username: ((artifactory-username))
-      artifactory-password: ((artifactory-password))
-      cf_app_name: mis-int1
-      file_prefix: 'mediainfosvc'
-      cf_preceding_appname: mis-dev
-      cf_space: 'integration'
-      cf_env: 'dev'
-      cf_preceding_space: 'development'
-      setautoscale: true
-      instance_number: 2      
-      memory: 256M
-      cf_api: https://api.system-dev.gp2.axadmin.net
-      s3_access_key: BNDW1H4EWBFDJ36H61F3
-      s3_bucket: rms-integration
-      s3_secret_key: WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g
-      s3_url: https://s3.gp2.axadmin.net
-      resilience_policy_min_wait_time_msecs: 1000
-      resilience_policy_max_wait_time_msecs: 20000
-      resilience_policy_max_retry_count: 3
-      cf_organization: mobile_backend
-      teams_url: ((teams-webhook-url))
-      newrelic_app_lic: ''
-      buildpack_one: '- newrelic_dotnet_core_buildpack'
-      buildpack_two: '- dotnet_core_buildpack'
+    - ci/pipelines/prod-pipeline.yml    
 
 - name: utility-dockerfile
   type: git
@@ -368,6 +397,108 @@ jobs:
             cf enable-autoscaling $cf_app_name 
           fi
 
+- name: deploy-green-pcpm
+  on_failure:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME QA - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
+      text: Job $BUILD_JOB_NAME failed.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - get: utility-image
+  - get: git-repo
+    version: latest
+    trigger: false
+  - task: prepare-manifest
+    image: utility-image
+    file: git-repo/ci/pipelines/tasks/prepare-manifest.yml
+    params:
+      <<: *pcpm-source
+  - task: deploy-pcpm
+    image: utility-image
+    file: git-repo/ci/pipelines/tasks/cfpush.yml
+    params:
+      <<: *pcpm-source  
+
+- name: blue-green-switch-pcpm
+  on_success:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME PCPM deployed successfully - Branch: ((branch-name))
+      text: Job $BUILD_JOB_NAME successful.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  on_failure:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
+      text: Job $BUILD_JOB_NAME failed.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - get: utility-image
+    passed: 
+     - deploy-green-pcpm
+    trigger: true
+  - task: blue-to-green
+    image: utility-image
+    params:
+      <<: *pcpm-source
+    config:
+      platform: linux
+      run:
+        path: bash
+        args:
+        - -exc
+        - |
+          set +x
+          cfpass=$(printenv cf_deploy_password)
+          cfuser=$(printenv cf_deploy_user)
+          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+          set -x
+          greenApps=$(cf apps | grep $cf_app_name-green | { grep -v grep || true; })
+          if [[ -z $greenApps ]]; then exit 0; fi
+          cf map-route $cf_app_name-green apps-$cf_env.gp2.axadmin.net -n $cf_app_name
+          cf unmap-route $cf_app_name apps-$cf_env.gp2.axadmin.net -n $cf_app_name
+          cf unmap-route $cf_app_name-green apps-$cf_env.gp2.axadmin.net -n $cf_app_name-green
+          cf stop $cf_app_name
+          cf delete $cf_app_name -f
+          # Remove the Green-Temp-Route.
+          cf delete-route apps-$cf_env.gp2.axadmin.net --hostname $cf_app_name-green -f
+          # Rename Green app to Blue app.
+          cf rename $cf_app_name-green $cf_app_name 
+  - task: autoscaling
+    image: utility-image
+    params: 
+      <<: *pcpm-source 
+      artifactory_endpoint:  https://na-artifact-01.na.audatex.com:8443/artifactory
+      artifactory_username: ((artifactory-username))
+      artifactory_password: ((artifactory-password))   
+    config:
+      platform: linux
+      inputs:
+      - name: git-repo
+      run:
+        path: bash
+        args: 
+        - -exc
+        - |
+          set +x
+          cf login -u $cf_deploy_user -p $cf_deploy_password -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+          set -x
+          if [ $setautoscale == true ]; then
+            cf bind-service $cf_app_name autoscale
+            curl -O -k -u $artifactory_username:$artifactory_password $artifactory_endpoint/devops-local/cf-plugins/autoscaler-linux32-2.0.91
+            cf install-plugin autoscaler-linux32-2.0.91 -f
+            cf update-autoscaling-limits $cf_app_name 2 4
+            cf create-autoscaling-rule $cf_app_name cpu 25 75
+            cf enable-autoscaling $cf_app_name 
+          fi
+
 groups:
 
 - name: mis
@@ -381,6 +512,11 @@ groups:
   jobs:
   - deploy-green-qa
   - blue-green-switch-qa
+
+- name: mis-pcpm
+  jobs:
+  - deploy-green-pcpm
+  - blue-green-switch-pcpm
 
 - name: mis-worker-images
   jobs:
