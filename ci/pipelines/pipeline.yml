@@ -479,9 +479,7 @@ jobs:
       artifactory_username: ((artifactory-username))
       artifactory_password: ((artifactory-password))   
     config:
-      platform: linux
-      inputs:
-      - name: git-repo
+      platform: linux      
       run:
         path: bash
         args: 
