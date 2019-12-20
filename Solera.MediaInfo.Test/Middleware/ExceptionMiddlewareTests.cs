@@ -1,7 +1,9 @@
+using AutoFixture;
+using AutoFixture.AutoMoq;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
 using Moq;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Solera.MediaInfo.Service.Middleware;
 using Solera.MediaInfo.Service.Models;
 using System;
@@ -12,19 +14,22 @@ using Xunit;
 namespace Solera.MediaInfo.Service.Test
 {
     [Trait("Category", "Unit")]
-    public class ExceptionMiddlewareTest : IDisposable
+    public class ExceptionMiddlewareTests : IDisposable
     {
         #region Private members
-        private ExceptionMiddleware _sut;
-        private Mock<ILogger<ExceptionMiddleware>> _mockLogger;
-        private Mock<RequestDelegate> _mockRequestDelegate;
+        private readonly Fixture _fixture;
+        private readonly ExceptionMiddleware _sut;
+        private readonly Mock<RequestDelegate> _mockRequestDelegate;
         #endregion
 
-        public ExceptionMiddlewareTest()
+        public ExceptionMiddlewareTests()
         {
-            _mockRequestDelegate = new Mock<RequestDelegate>();            
-            _mockLogger = new Mock<ILogger<ExceptionMiddleware>>();
-            _sut = new ExceptionMiddleware(_mockRequestDelegate.Object, _mockLogger.Object);
+            _fixture = new Fixture();
+            _fixture.Customize(new AutoMoqCustomization());
+
+            _mockRequestDelegate = _fixture.Freeze<Mock<RequestDelegate>>();
+            _fixture.Inject(_mockRequestDelegate.Object);
+            _sut = _fixture.Create<ExceptionMiddleware>();
         }
 
         [Fact]
@@ -58,15 +63,18 @@ namespace Solera.MediaInfo.Service.Test
 
             // Assert
             _mockRequestDelegate.Verify();
+            Assert.Equal(StatusCodes.Status500InternalServerError, context.Response.StatusCode);
+
             context.Response.Body.Seek(0, SeekOrigin.Begin);
             var reader = new StreamReader(context.Response.Body);
             var streamText = reader.ReadToEnd();
             var objResponse = JsonConvert.DeserializeObject<Response<string>>(streamText);
-
-            Assert.Equal(StatusCodes.Status500InternalServerError, context.Response.StatusCode);
             Assert.Equal(StatusCodes.Status500InternalServerError, objResponse.StatusCode);
             Assert.False(objResponse.IsSuccess);
             Assert.NotEmpty(objResponse.Message);
+
+            var jObj = JObject.Parse(streamText);
+            Assert.True(jObj.ContainsKey("isSuccess"), "should return camel case json");
         }
 
         public void Dispose()
