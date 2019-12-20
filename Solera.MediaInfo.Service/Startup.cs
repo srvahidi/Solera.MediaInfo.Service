@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Polly.Registry;
+using Solera.MediaInfo.Service.Constants;
 using Solera.MediaInfo.Service.Filters;
 using Solera.MediaInfo.Service.Helpers;
 using Solera.MediaInfo.Service.Middleware;
@@ -50,7 +51,9 @@ namespace Solera.MediaInfo.Service
             {
                 app.UseHsts();
             }
-            app.ConfigureCustomExceptionMiddleware();
+            app.ConfigureCustomExceptionMiddleware(ApiInfo.PRODUCT, ApiInfo.LAYER);
+            app.MapWhen(context => context.Request.Path.StartsWithSegments("/api/health"),
+                builder => builder.UseHealthCheckMiddleware());
             app.UseHttpsRedirection();
             app.UseMvc();
             app.UseCloudFoundryActuators();
