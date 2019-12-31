@@ -117,32 +117,13 @@ resources:
     private_key: ((private-repo-key))
     ignore_paths:
     - ci/pipelines/pipeline.yml
-    - ci/pipelines/demo-pipeline.yml
     - ci/pipelines/prod-pipeline.yml    
-
-- name: utility-dockerfile
-  type: git
-  source:
-    uri: ((bitbucket-uri))
-    branch: ((branch-name))
-    private_key: ((private-repo-key))
-    paths:
-      - ci/utility
-
-- name: dotnet-dockerfile
-  type: git
-  source:
-    uri: ((bitbucket-uri))
-    private_key: ((private-repo-key))
-    branch: ((branch-name))
-    paths:
-      - ci/dotnet
 
 - name: artifacts
   type: artifactory
   source:
     endpoint: https://na-artifact-01.na.audatex.com:8443/artifactory
-    repository: /autosource/mediainfo-service
+    repository: /mobile-backend/mediainfo-service
     regex: "mediainfosvc-(?<version>.*).zip"
     username: ((artifactory-username))
     password: ((artifactory-password))
@@ -151,7 +132,7 @@ resources:
 - name: dotnet-image
   type: docker-image
   source:
-    repository: ((internal-docker-addr))/gdc/mis_dotnet_dev
+    repository: ((internal-docker-addr))/gdc/mobile-backend/mobile-dotnet2.1
     username: ((internal-docker-user))
     password: ((internal-docker-pass))
     tag: "latest"
@@ -159,12 +140,12 @@ resources:
 - name: utility-image
   type: docker-image
   source:
-    repository: ((internal-docker-addr))/gdc/mis_utility_dev
+    repository: ((internal-docker-addr))/gdc/mobile-backend/mobile-utility
     username: ((internal-docker-user))
     password: ((internal-docker-pass))
     tag: "latest"
 
-- name: cf-deploy
+- name: cf-dev
   type: cf-resource
   source:
     api: ((cf-preprd-api))
@@ -172,6 +153,26 @@ resources:
     password: ((cf-preprd-password))
     organization: mobile_backend
     space: development
+    skip_cert_check: true
+
+- name: cf-qa
+  type: cf-resource
+  source:
+    api: ((cf-preprd-api))
+    username: ((cf-preprd-username))
+    password: ((cf-preprd-password))
+    organization: mobile_backend
+    space: integration
+    skip_cert_check: true
+
+- name: cf-pcpm
+  type: cf-resource
+  source:
+    api: ((cf-preprd-api))
+    username: ((cf-preprd-username))
+    password: ((cf-preprd-password))
+    organization: mobile_backend
+    space: pcpm
     skip_cert_check: true
 
 - name: teams-alert
@@ -189,24 +190,6 @@ resources:
 
 jobs:
 
-- name: build-dotnet-image
-  plan:
-  - get: dotnet-dockerfile
-    trigger: true
-    version: every
-  - put: dotnet-image
-    params:
-      build: dotnet-dockerfile/ci/dotnet
-
-- name: build-utility-image
-  plan:
-  - get: utility-dockerfile
-    trigger: true
-    version: every
-  - put: utility-image
-    params:
-      build: utility-dockerfile/ci/utility
-
 - name: build-and-test-green
   on_failure:
     put: teams-alert
@@ -217,15 +200,70 @@ jobs:
       actionName: View Job $BUILD_JOB_NAME Results
       actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
-  - get: dotnet-image
-  - get: git-repo
-    trigger: true
-    version: every
-  - task: build-test
+  - in_parallel:
+    - get: dotnet-image
+    - get: git-repo
+      version: latest
+      trigger: true
+  - task: build-app
     image: dotnet-image
-    file: git-repo/ci/pipelines/tasks/build.yml
     params:
       <<: *dev-source
+    config:
+      platform: linux
+      inputs:
+      - name: git-repo
+      outputs:
+      - name: binaries
+      run:
+        dir: git-repo
+        path: bash
+        args:
+        - -exc
+        - |          
+          cd ..
+          output_directory=${PWD}/binaries       
+          cd git-repo/Solera.MediaInfo.Service
+          dotnet publish -c release -o ${output_directory}  
+          cd ..
+          cp ${PWD}/ci/pipelines/manifest.yml ${output_directory}/manifest.yml
+  - task: run-unit-tests
+    image: dotnet-image
+    config:
+      platform: linux
+      inputs:
+      - name: git-repo
+      run:
+        path: bash
+        dir: git-repo
+        args:
+        - -exc
+        - |
+          dotnet test ./Solera.MediaInfo.Test/Solera.MediaInfo.Test.csproj 
+  - task: publish
+    image: dotnet-image
+    params:
+      <<: *dev-source
+    config:
+      platform: linux
+      inputs:
+      - name : binaries
+      - name : git-repo
+      outputs:
+      - name: artifacts
+      run:        
+        path: sh
+        args:
+        - -exc
+        - |          
+          fileprefix=$(printenv file_prefix)
+          cd ${PWD}/git-repo
+          version=$(git describe --always | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+          filename=${fileprefix}-${version}.zip
+          cd ..
+          cd ${PWD}/binaries
+          zip -r ${filename} ./*
+          mv ${filename} ../artifacts/${filename}
   - put: artifacts
     params:
       file: artifacts/mediainfosvc-*.zip
@@ -240,17 +278,29 @@ jobs:
         actionName: View Job $BUILD_JOB_NAME Results
         actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
-  - get: git-repo
-  - get: artifacts
-    trigger: true
-    passed:
-       - build-and-test-green
+  - in_parallel:
+    - get: git-repo 
+    - get: artifacts
+      passed: 
+        - build-and-test-green
+      trigger: true     
   - task: execute-code-analysis
-    file: git-repo/ci/pipelines/tasks/code-analysis.yml
     params:
       branch: ((branch-name))
+      project-name: MediainfoService
       sonar-auth-token: ((sonar-auth-token))
       sonar-url: ((sonar-url))
+    config: 
+      platform: windows
+      inputs:
+      - name: git-repo
+      outputs:
+      - name: analysis-output
+      run:
+        path: powershell.exe
+        args:
+        - -File
+        - '.\git-repo\ci\scripts\code-analysis.ps1'
   ensure:
      put: project-metrics
      params:
@@ -268,22 +318,53 @@ jobs:
       actionName: View Job $BUILD_JOB_NAME Results
       actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
-  - get: utility-image
-  - get: git-repo
-  - get: artifacts
-    version: every
-    trigger: true
-    passed:
-     - code-analysis-green
+  - in_parallel:
+    - get: utility-image    
+    - get: artifacts
+      passed:
+      - code-analysis-green
+      trigger: true
   - task: prepare-manifest
     image: utility-image
-    file: git-repo/ci/pipelines/tasks/prepare-manifest.yml
-    input_mapping: {git-repo: artifacts}
     params:
       <<: *dev-source
-  - put: cf-deploy
+    config:
+      platform: linux
+      inputs:
+      - name: artifacts
+      outputs:
+      - name: deployables
+      run:
+        path: sh
+        args:
+        - -exc
+        - |
+          fileprefix=$(printenv file_prefix)
+          input_directory=${PWD}/artifacts
+          output_directory=${PWD}/deployables
+          manifest_file=${output_directory}/manifest.yml  
+          zip_file=${fileprefix}-*.zip 
+          unzip ${input_directory}/${zip_file} -d ${output_directory}
+          echo "Listing the directory"
+          ls -a
+          echo "Listing the directory-End"
+          sed -i -e "s/\[buildpack_one\]/${buildpack_one}/" ${manifest_file}
+          sed -i -e "s/\[buildpack_two\]/${buildpack_two}/" ${manifest_file}
+          sed -i -e "s/\[app_name\]/${cf_app_name}-green/" ${manifest_file}
+          sed -i -e "s/\[instances\]/${instance_number}/" ${manifest_file}
+          sed -i -e "s/\[memory\]/${memory}/" ${manifest_file}
+          sed -i -e "s/\[newrelic_app_name\]/${cf_app_name}/" ${manifest_file}
+          sed -i -e "s/\[newrelic_app_lic\]/${newrelic_app_lic}/" ${manifest_file}
+          sed -i -e "s/\[s3_access_key\]/${s3_access_key}/" ${manifest_file}
+          sed -i -e "s/\[s3_bucket\]/${s3_bucket}/" ${manifest_file}
+          sed -i -e "s/\[s3_secret_key\]/${s3_secret_key}/" ${manifest_file}
+          sed -i -e "s~\[s3_url\]~${s3_url}~" ${manifest_file}
+          sed -i -e "s/\[resilience_policy_min_wait_time_msecs\]/${resilience_policy_min_wait_time_msecs}/" ${manifest_file}
+          sed -i -e "s/\[resilience_policy_max_wait_time_msecs\]/${resilience_policy_max_wait_time_msecs}/" ${manifest_file}
+          sed -i -e "s/\[resilience_policy_max_retry_count\]/${resilience_policy_max_retry_count}/" ${manifest_file}
+  - put: cf-dev
     params:
-      manifest: deployables/ci/pipelines/manifest.yml
+      manifest: deployables/manifest.yml
       path: deployables
 
 - name: blue-green-switch-dev
@@ -294,7 +375,7 @@ jobs:
         $BUILD_PIPELINE_NAME Dev deployed successfully - Branch: ((branch-name))
       text: Job $BUILD_JOB_NAME successful.
       actionName: View Job $BUILD_JOB_NAME Results
-      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   on_failure:
     put: teams-alert
     params:
@@ -302,73 +383,167 @@ jobs:
         $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
       text: Job $BUILD_JOB_NAME failed.
       actionName: View Job $BUILD_JOB_NAME Results
-      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
-  - get: utility-image
-  - get: git-repo
-    passed:
-     - deploy-green-dev
-    trigger: true
+  - in_parallel:
+    - get: utility-image
+    - get: cf-dev
+      passed: 
+      - deploy-green-dev
+      trigger: true
   - task: blue-to-green
     image: utility-image
-    file: git-repo/ci/pipelines/tasks/blue-to-green.yml
-    params:
+    params: 
       <<: *dev-source
+    config:
+      platform: linux
+      run:
+        path: sh
+        args:
+        - -exc
+        - |  
+          set +x
+          cfpass=$(printenv cf_deploy_password)
+          cfuser=$(printenv cf_deploy_user)
+          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+          set -x
+          greenApps=$(cf apps | grep $cf_app_name-green | { grep -v grep || true; })
+          if [[ -z $greenApps ]]; then exit 0; fi
+          cf map-route $cf_app_name-green apps-$cf_env.gp2.axadmin.net -n $cf_app_name
+          cf unmap-route $cf_app_name apps-$cf_env.gp2.axadmin.net -n $cf_app_name
+          cf unmap-route $cf_app_name-green apps-$cf_env.gp2.axadmin.net -n $cf_app_name-green
+          cf stop $cf_app_name
+          cf delete $cf_app_name -f
+          # Remove the Green-Temp-Route.
+          cf delete-route apps-$cf_env.gp2.axadmin.net --hostname $cf_app_name-green -f
+          # Rename Green app to Blue app.
+          cf rename $cf_app_name-green $cf_app_name
 
 - name: deploy-green-qa
   on_failure:
     put: teams-alert
     params:
       title: |
-        $BUILD_PIPELINE_NAME QA - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
       text: Job $BUILD_JOB_NAME failed.
       actionName: View Job $BUILD_JOB_NAME Results
       actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
-  - get: utility-image
-  - get: git-repo
-    passed:
-     - blue-green-switch-dev
+  - get: utility-image  
     trigger: false
   - task: prepare-manifest
     image: utility-image
-    file: git-repo/ci/pipelines/tasks/prepare-manifest.yml
     params:
       <<: *qa-source
-  - task: deploy-qa
-    image: utility-image
-    file: git-repo/ci/pipelines/tasks/cfpush.yml
+    config:
+      platform: linux
+      outputs:
+      - name: deployables
+      run:
+        path: sh
+        args:
+        - -exc
+        - |  
+          set +x
+          cfpass=$(printenv cf_deploy_password)
+          cfuser=$(printenv cf_deploy_user)
+          artifactorypass=$(printenv artifactory-password)
+          artifactoryuser=$(printenv artifactory-username)
+          cfappname=$(printenv cf_app_name)                
+          
+          cf login -u $cfuser -p $cfpass -a $cf_api -o $cf_organization -s $cf_space
+          precedingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_preceding_appname.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+          echo "precedingversion" echo $precedingversion
+          set -x
+          workingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_app_name.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+          echo "workingversion" echo $workingversion          
+
+          if [ "$workingversion" = "$precedingversion" ]; then
+          echo "Skipping deployment...New version not available for deployment"
+          exit 0;
+          fi
+
+          index=`expr index "${precedingversion}" g`
+          git=$(echo ${precedingversion:$index})
+          artifact=$file_prefix-${precedingversion}.zip
+
+          #download zip file
+          set +x
+          curl -OL -k -u $artifactoryuser:$artifactorypass https://na-artifact-01.na.audatex.com:8443/artifactory/mobile-backend/mediainfo-service/$artifact
+          set -x
+
+          #extract zip
+          output_directory=${PWD}/deployables
+          unzip -q $artifact -d $output_directory
+          manifest_file=${output_directory}/manifest.yml
+
+          echo "Listing the directory"
+          ls -a
+          echo "Listing the directory-End"
+          sed -i -e "s/\[buildpack_one\]/${buildpack_one}/" ${manifest_file}
+          sed -i -e "s/\[buildpack_two\]/${buildpack_two}/" ${manifest_file}
+          sed -i -e "s/\[app_name\]/${cf_app_name}-green/" ${manifest_file}
+          sed -i -e "s/\[instances\]/${instance_number}/" ${manifest_file}
+          sed -i -e "s/\[memory\]/${memory}/" ${manifest_file}
+          sed -i -e "s/\[newrelic_app_name\]/${cf_app_name}/" ${manifest_file}
+          sed -i -e "s/\[newrelic_app_lic\]/${newrelic_app_lic}/" ${manifest_file}
+          sed -i -e "s~\[gadget_url\]~${gadget_url}~" ${manifest_file}
+  - put: cf-qa
     params:
-      <<: *qa-source
+      manifest: deployables/manifest.yml
+      path: deployables
 
 - name: blue-green-switch-qa
   on_success:
     put: teams-alert
     params:
       title: |
-        $BUILD_PIPELINE_NAME QA deployed successfully - Branch: ((branch-name))
+        $BUILD_PIPELINE_NAME Int deployed successfully
       text: Job $BUILD_JOB_NAME successful.
       actionName: View Job $BUILD_JOB_NAME Results
-      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   on_failure:
     put: teams-alert
     params:
       title: |
-        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
       text: Job $BUILD_JOB_NAME failed.
       actionName: View Job $BUILD_JOB_NAME Results
-      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
-  - get: utility-image
-  - get: git-repo
-    passed:
-     - deploy-green-qa
-    trigger: true
+  - in_parallel:
+    - get: utility-image  
+    - get: cf-qa          
+      passed: 
+      - deploy-green-qa
+      trigger: true
   - task: blue-to-green
     image: utility-image
-    file: git-repo/ci/pipelines/tasks/blue-to-green.yml
-    params:
-      <<: *qa-source
+    params: 
+      <<: *qa-source 
+    config:
+      platform: linux
+      run:
+        path: sh
+        args:
+        - -exc
+        - |  
+          set +x
+          cfpass=$(printenv cf_deploy_password)
+          cfuser=$(printenv cf_deploy_user)
+          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+          set -x
+          greenApps=$(cf apps | grep $cf_app_name-green | { grep -v grep || true; })
+          if [[ -z $greenApps ]]; then exit 0; fi
+          cf map-route $cf_app_name-green apps-$cf_env.gp2.axadmin.net -n $cf_app_name
+          cf unmap-route $cf_app_name apps-$cf_env.gp2.axadmin.net -n $cf_app_name
+          cf unmap-route $cf_app_name-green apps-$cf_env.gp2.axadmin.net -n $cf_app_name-green
+          cf stop $cf_app_name
+          cf delete $cf_app_name -f
+          # Remove the Green-Temp-Route.
+          cf delete-route apps-$cf_env.gp2.axadmin.net --hostname $cf_app_name-green -f
+          # Rename Green app to Blue app.
+          cf rename $cf_app_name-green $cf_app_name
   - task: autoscaling
     image: utility-image
     params: 
@@ -377,11 +552,9 @@ jobs:
       artifactory_username: ((artifactory-username))
       artifactory_password: ((artifactory-password))   
     config:
-      platform: linux
-      inputs:
-      - name: git-repo
+      platform: linux      
       run:
-        path: bash
+        path: sh
         args: 
         - -exc
         - |
@@ -402,32 +575,81 @@ jobs:
     put: teams-alert
     params:
       title: |
-        $BUILD_PIPELINE_NAME QA - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
       text: Job $BUILD_JOB_NAME failed.
       actionName: View Job $BUILD_JOB_NAME Results
       actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
-  - get: utility-image
-  - get: git-repo
-    version: latest
+  - get: utility-image  
     trigger: false
   - task: prepare-manifest
     image: utility-image
-    file: git-repo/ci/pipelines/tasks/prepare-manifest.yml
     params:
       <<: *pcpm-source
-  - task: deploy-pcpm
-    image: utility-image
-    file: git-repo/ci/pipelines/tasks/cfpush.yml
+    config:
+      platform: linux
+      outputs:
+      - name: deployables
+      run:
+        path: sh
+        args:
+        - -exc
+        - |  
+          set +x
+          cfpass=$(printenv cf_deploy_password)
+          cfuser=$(printenv cf_deploy_user)
+          artifactorypass=$(printenv artifactory-password)
+          artifactoryuser=$(printenv artifactory-username)
+          cfappname=$(printenv cf_app_name)                
+          
+          cf login -u $cfuser -p $cfpass -a $cf_api -o $cf_organization -s $cf_space
+          precedingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_preceding_appname.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+          echo "precedingversion" echo $precedingversion
+          set -x
+          workingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_app_name.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+          echo "workingversion" echo $workingversion          
+
+          if [ "$workingversion" = "$precedingversion" ]; then
+          echo "Skipping deployment...New version not available for deployment"
+          exit 0;
+          fi
+
+          index=`expr index "${precedingversion}" g`
+          git=$(echo ${precedingversion:$index})
+          artifact=$file_prefix-${precedingversion}.zip
+
+          #download zip file
+          set +x
+          curl -OL -k -u $artifactoryuser:$artifactorypass https://na-artifact-01.na.audatex.com:8443/artifactory/mobile-backend/mediainfo-service/$artifact
+          set -x
+
+          #extract zip
+          output_directory=${PWD}/deployables
+          unzip -q $artifact -d $output_directory
+          manifest_file=${output_directory}/manifest.yml
+
+          echo "Listing the directory"
+          ls -a
+          echo "Listing the directory-End"
+          sed -i -e "s/\[buildpack_one\]/${buildpack_one}/" ${manifest_file}
+          sed -i -e "s/\[buildpack_two\]/${buildpack_two}/" ${manifest_file}
+          sed -i -e "s/\[app_name\]/${cf_app_name}-green/" ${manifest_file}
+          sed -i -e "s/\[instances\]/${instance_number}/" ${manifest_file}
+          sed -i -e "s/\[memory\]/${memory}/" ${manifest_file}
+          sed -i -e "s/\[newrelic_app_name\]/${cf_app_name}/" ${manifest_file}
+          sed -i -e "s/\[newrelic_app_lic\]/${newrelic_app_lic}/" ${manifest_file}
+          sed -i -e "s~\[gadget_url\]~${gadget_url}~" ${manifest_file}
+  - put: cf-pcpm
     params:
-      <<: *pcpm-source  
+      manifest: deployables/manifest.yml
+      path: deployables
 
 - name: blue-green-switch-pcpm
   on_success:
     put: teams-alert
     params:
       title: |
-        $BUILD_PIPELINE_NAME PCPM deployed successfully - Branch: ((branch-name))
+        $BUILD_PIPELINE_NAME PCPM deployed successfully
       text: Job $BUILD_JOB_NAME successful.
       actionName: View Job $BUILD_JOB_NAME Results
       actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
@@ -435,15 +657,17 @@ jobs:
     put: teams-alert
     params:
       title: |
-        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
       text: Job $BUILD_JOB_NAME failed.
       actionName: View Job $BUILD_JOB_NAME Results
       actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
-  - get: utility-image
-    passed: 
-     - deploy-green-pcpm
-    trigger: true
+  - in_parallel:
+    - get: utility-image
+    - get: cf-pcpm   
+      passed:
+      - deploy-green-pcpm
+      trigger: true
   - task: blue-to-green
     image: utility-image
     params:
@@ -451,7 +675,7 @@ jobs:
     config:
       platform: linux
       run:
-        path: bash
+        path: sh
         args:
         - -exc
         - |
@@ -473,16 +697,16 @@ jobs:
           cf rename $cf_app_name-green $cf_app_name 
   - task: autoscaling
     image: utility-image
-    params: 
-      <<: *pcpm-source 
+    params:
+      <<: *pcpm-source
       artifactory_endpoint:  https://na-artifact-01.na.audatex.com:8443/artifactory
       artifactory_username: ((artifactory-username))
-      artifactory_password: ((artifactory-password))   
+      artifactory_password: ((artifactory-password))
     config:
-      platform: linux      
+      platform: linux
       run:
-        path: bash
-        args: 
+        path: sh
+        args:
         - -exc
         - |
           set +x
@@ -494,7 +718,7 @@ jobs:
             cf install-plugin autoscaler-linux32-2.0.91 -f
             cf update-autoscaling-limits $cf_app_name 2 4
             cf create-autoscaling-rule $cf_app_name cpu 25 75
-            cf enable-autoscaling $cf_app_name 
+            cf enable-autoscaling $cf_app_name
           fi
 
 groups:
@@ -515,8 +739,3 @@ groups:
   jobs:
   - deploy-green-pcpm
   - blue-green-switch-pcpm
-
-- name: mis-worker-images
-  jobs:
-  - build-dotnet-image
-  - build-utility-image
