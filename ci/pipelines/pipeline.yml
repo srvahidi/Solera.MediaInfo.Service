@@ -487,7 +487,13 @@ jobs:
           sed -i -e "s/\[memory\]/${memory}/" ${manifest_file}
           sed -i -e "s/\[newrelic_app_name\]/${cf_app_name}/" ${manifest_file}
           sed -i -e "s/\[newrelic_app_lic\]/${newrelic_app_lic}/" ${manifest_file}
-          sed -i -e "s~\[gadget_url\]~${gadget_url}~" ${manifest_file}
+          sed -i -e "s/\[s3_access_key\]/${s3_access_key}/" ${manifest_file}
+          sed -i -e "s/\[s3_bucket\]/${s3_bucket}/" ${manifest_file}
+          sed -i -e "s/\[s3_secret_key\]/${s3_secret_key}/" ${manifest_file}
+          sed -i -e "s~\[s3_url\]~${s3_url}~" ${manifest_file}
+          sed -i -e "s/\[resilience_policy_min_wait_time_msecs\]/${resilience_policy_min_wait_time_msecs}/" ${manifest_file}
+          sed -i -e "s/\[resilience_policy_max_wait_time_msecs\]/${resilience_policy_max_wait_time_msecs}/" ${manifest_file}
+          sed -i -e "s/\[resilience_policy_max_retry_count\]/${resilience_policy_max_retry_count}/" ${manifest_file}
   - put: cf-qa
     params:
       manifest: deployables/manifest.yml
@@ -638,7 +644,13 @@ jobs:
           sed -i -e "s/\[memory\]/${memory}/" ${manifest_file}
           sed -i -e "s/\[newrelic_app_name\]/${cf_app_name}/" ${manifest_file}
           sed -i -e "s/\[newrelic_app_lic\]/${newrelic_app_lic}/" ${manifest_file}
-          sed -i -e "s~\[gadget_url\]~${gadget_url}~" ${manifest_file}
+          sed -i -e "s/\[s3_access_key\]/${s3_access_key}/" ${manifest_file}
+          sed -i -e "s/\[s3_bucket\]/${s3_bucket}/" ${manifest_file}
+          sed -i -e "s/\[s3_secret_key\]/${s3_secret_key}/" ${manifest_file}
+          sed -i -e "s~\[s3_url\]~${s3_url}~" ${manifest_file}
+          sed -i -e "s/\[resilience_policy_min_wait_time_msecs\]/${resilience_policy_min_wait_time_msecs}/" ${manifest_file}
+          sed -i -e "s/\[resilience_policy_max_wait_time_msecs\]/${resilience_policy_max_wait_time_msecs}/" ${manifest_file}
+          sed -i -e "s/\[resilience_policy_max_retry_count\]/${resilience_policy_max_retry_count}/" ${manifest_file}
   - put: cf-pcpm
     params:
       manifest: deployables/manifest.yml
