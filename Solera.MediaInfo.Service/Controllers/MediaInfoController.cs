@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Polly;
 using Polly.Registry;
+using Solera.MediaInfo.Service.Constants;
 using Solera.MediaInfo.Service.Filters;
 using Solera.MediaInfo.Service.Helpers;
 using Solera.MediaInfo.Service.Models;
@@ -38,7 +39,7 @@ namespace Solera.MediaInfo.Service.Controllers
             _logger = logger;
             _s3Client = s3Client;
             _transferUtilitySimpleFactory = transferUtilitySimpleFactory;
-            _s3bucket = Environment.GetEnvironmentVariable("S3_BUCKET");
+            _s3bucket = Environment.GetEnvironmentVariable(EnvironmentVariable.S3_BUCKET);
             this.polyRegistry = polyRegistry;
         }
 
