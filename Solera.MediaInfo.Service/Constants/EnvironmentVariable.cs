@@ -4,7 +4,7 @@
     {
         public const string
             S3_ACCESS_KEY = "S3_ACCESS_KEY",
-            S3_URL = "S3_URL",
+            S3_URL = "S3:ServiceURL",
             S3_SECRET_KEY = "S3_SECRET_KEY",
             S3_BUCKET = "S3_BUCKET",
             RESILIENCE_POLICY_MIN_WAIT_TIME_MSECS = "RESILIENCE_POLICY_MIN_WAIT_TIME_MSECS",

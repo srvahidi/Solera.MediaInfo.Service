@@ -1,9 +1,5 @@
 ﻿using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using MockWebHost;
-using Moq;
 using Solera.MediaInfo.E2eTests.Utilities;
 using Solera.MediaInfo.Service.Constants;
 using System;
@@ -21,11 +17,7 @@ namespace Solera.MediaInfo.E2eTests
 
         private readonly IDisposable _misApp;
 
-        private readonly IWebHost _fakeS3ApiHost;
-
         public HttpClient Client { get; }
-
-        public Mock<MockHost> S3ApiMock => _fakeS3ApiHost.Services.GetService<MockHost>().Mock;
 
         public AppFixture()
         {
@@ -46,12 +38,6 @@ namespace Solera.MediaInfo.E2eTests
                 _misApp = RunMis(solutionDirectory, envVars);
             }
 
-            var s3Url = GetS3Url();
-            Console.WriteLine($"Running fake S3 API Service with startUrl={s3Url}...");
-            _fakeS3ApiHost = RunFakeHost(new Uri(s3Url).Port);
-
-            WaitForHealthcheckOK("Fake S3 API Service", $"{s3Url}/api/health");
-
             WaitForHealthcheckOK("Solera.MediaInfo.Service", $"{MisUrl}/api/health");
             Client = new HttpClient();
         }
@@ -59,7 +45,6 @@ namespace Solera.MediaInfo.E2eTests
         public void Dispose()
         {
             _misApp?.Dispose();
-            _fakeS3ApiHost?.Dispose();
         }
 
         private IWebHost RunFakeHost(int port)
@@ -108,7 +93,7 @@ namespace Solera.MediaInfo.E2eTests
                     Environment = {
                         { "ASPNETCORE_URLS", MisUrl },
                         { EnvironmentVariable.ASPNETCORE_ENVIRONMENT, environmentVariables.AspNetCoreEnvironment },
-                        //{ EnvironmentVariable.S3_URL, environmentVariables.S3ApiUrl },
+                        { EnvironmentVariable.S3_URL, environmentVariables.S3ApiUrl }, // overwrite appsettings S3:ServiceUrl 
                         { EnvironmentVariable.S3_BUCKET, environmentVariables.S3Bucket },
                         { EnvironmentVariable.S3_ACCESS_KEY, environmentVariables.S3AccessKey },
                         { EnvironmentVariable.S3_SECRET_KEY, environmentVariables.S3SecretKey },
@@ -150,15 +135,15 @@ namespace Solera.MediaInfo.E2eTests
             public EnvironmentVariables()
             {
                 AspNetCoreEnvironment = Environment.GetEnvironmentVariable(EnvironmentVariable.ASPNETCORE_ENVIRONMENT) ?? "local";
-                //S3ApiUrl = Environment.GetEnvironmentVariable(EnvironmentVariable.S3_URL) ?? "http://localhost:5015";
+                S3ApiUrl = Environment.GetEnvironmentVariable(EnvironmentVariable.S3_URL) ?? "https://s3.gp2.axadmin.net";
                 S3AccessKey = Environment.GetEnvironmentVariable(EnvironmentVariable.S3_ACCESS_KEY) ?? "BNDW1H4EWBFDJ36H61F3";
                 S3SecretKey = Environment.GetEnvironmentVariable(EnvironmentVariable.S3_SECRET_KEY) ?? "WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g";
-                S3Bucket = Environment.GetEnvironmentVariable(EnvironmentVariable.S3_BUCKET) ?? "rms-development";
+                S3Bucket = Environment.GetEnvironmentVariable(EnvironmentVariable.S3_BUCKET) ?? "rms-e2etest";
                 MinWait = Environment.GetEnvironmentVariable(EnvironmentVariable.RESILIENCE_POLICY_MIN_WAIT_TIME_MSECS) ?? "1000";
                 MaxWait = Environment.GetEnvironmentVariable(EnvironmentVariable.RESILIENCE_POLICY_MAX_WAIT_TIME_MSECS) ?? "3000";
                 RetryCount = Environment.GetEnvironmentVariable(EnvironmentVariable.RESILIENCE_POLICY_MAX_RETRY_COUNT) ?? "3";
             }
-            //public string S3ApiUrl { get; private set; }
+            public string S3ApiUrl { get; private set; }
 
             public string S3AccessKey { get; private set; }
 
@@ -174,19 +159,5 @@ namespace Solera.MediaInfo.E2eTests
 
             public string AspNetCoreEnvironment { get; private set; }
         }
-
-        private static string GetS3Url()
-        {
-            var config = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-            .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable(EnvironmentVariable.ASPNETCORE_ENVIRONMENT)}.json", optional: true)
-            .AddEnvironmentVariables()
-            .Build();
-
-            var awsOptions = config.GetAWSOptions("S3");
-            return awsOptions.DefaultClientConfig?.ServiceURL ?? "http://localhost:5015";
-        }
-
     }
 }
