@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Polly;
 using Polly.Registry;
+using Solera.MediaInfo.Service.Constants;
 using Solera.MediaInfo.Service.Controllers;
 using Solera.MediaInfo.Service.Helpers;
 using Solera.MediaInfo.Service.Models;
@@ -37,7 +38,7 @@ namespace Solera.MediaInfo.Service.Test
         public MediaInfoControllerTest()
         {
             _fixture = new Fixture();
-            Environment.SetEnvironmentVariable("S3_BUCKET", BUCKET);
+            Environment.SetEnvironmentVariable(EnvironmentVariable.S3_BUCKET, BUCKET);
             Mock<IReadOnlyPolicyRegistry<string>> mockPolicyRegistry = new Mock<IReadOnlyPolicyRegistry<string>>();
             mockPolicyRegistry.Setup(pol => pol.Get<IAsyncPolicy>("mbePolicy")).Returns(Policy.NoOpAsync());
             _mocklogger = new Mock<ILogger<MediaInfoController>>();

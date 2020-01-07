@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
+using Solera.MediaInfo.Service.Constants;
+using System;
 
 namespace Solera.MediaInfo.Service.Helpers
 {
@@ -27,9 +25,9 @@ namespace Solera.MediaInfo.Service.Helpers
     {
         public EnvironmentConfiguration(IConfiguration configuration)
         {
-            ResiliencePolicyMinWaitTimeInMsecs = Convert.ToUInt16(Environment.GetEnvironmentVariable("RESILIENCE_POLICY_MIN_WAIT_TIME_MSECS"));
-            ResiliencePolicyMaxWaitTimeInMsecs = Convert.ToUInt16(Environment.GetEnvironmentVariable("RESILIENCE_POLICY_MAX_WAIT_TIME_MSECS"));
-            ResiliencePolicyMaxRetryCount = Convert.ToUInt16(Environment.GetEnvironmentVariable("RESILIENCE_POLICY_MAX_RETRY_COUNT"));
+            ResiliencePolicyMinWaitTimeInMsecs = Convert.ToUInt16(Environment.GetEnvironmentVariable(EnvironmentVariable.RESILIENCE_POLICY_MIN_WAIT_TIME_MSECS));
+            ResiliencePolicyMaxWaitTimeInMsecs = Convert.ToUInt16(Environment.GetEnvironmentVariable(EnvironmentVariable.RESILIENCE_POLICY_MAX_WAIT_TIME_MSECS));
+            ResiliencePolicyMaxRetryCount = Convert.ToUInt16(Environment.GetEnvironmentVariable(EnvironmentVariable.RESILIENCE_POLICY_MAX_RETRY_COUNT));
 
         }
 
