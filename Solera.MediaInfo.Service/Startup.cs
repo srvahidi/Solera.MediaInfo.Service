@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Polly.Registry;
+using Serilog;
 using Solera.MediaInfo.Service.Constants;
 using Solera.MediaInfo.Service.Filters;
 using Solera.MediaInfo.Service.Helpers;
@@ -51,13 +52,20 @@ namespace Solera.MediaInfo.Service
             {
                 app.UseHsts();
             }
+
+            app.UseHttpsRedirection();
+
+            // Write streamlined request completion events, instead of the more verbose ones from the framework.
+            // To use the default framework request logging instead, remove this line and set the "Microsoft"
+            // level in appsettings.json to "Information".
+            app.UseSerilogRequestLogging();
+
             app.ConfigureCustomExceptionMiddleware(ApiInfo.PRODUCT, ApiInfo.LAYER);
             app.MapWhen(context => context.Request.Path.StartsWithSegments("/api/health"),
                 builder => builder.UseHealthCheckMiddleware());
-            app.UseHttpsRedirection();
+
             app.UseMvc();
             app.UseCloudFoundryActuators();
-
         }
     }
 }
