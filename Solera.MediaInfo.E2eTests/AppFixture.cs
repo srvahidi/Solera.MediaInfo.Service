@@ -1,6 +1,4 @@
-﻿using Microsoft.AspNetCore;
-using Microsoft.AspNetCore.Hosting;
-using Solera.MediaInfo.E2eTests.Utilities;
+﻿using Solera.MediaInfo.E2eTests.Utilities;
 using Solera.MediaInfo.Service.Constants;
 using System;
 using System.Diagnostics;
@@ -45,13 +43,6 @@ namespace Solera.MediaInfo.E2eTests
         public void Dispose()
         {
             _misApp?.Dispose();
-        }
-
-        private IWebHost RunFakeHost(int port)
-        {
-            var fakeApiHost = WebHost.CreateDefaultBuilder().UseKestrel(options => options.ListenLocalhost(port)).UseStartup<MockWebHost.Startup>().Build();
-            fakeApiHost.Start();
-            return fakeApiHost;
         }
 
         private static void PublishProject(DirectoryInfo rootDirectory)

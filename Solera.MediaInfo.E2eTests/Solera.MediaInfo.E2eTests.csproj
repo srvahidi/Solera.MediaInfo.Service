@@ -24,7 +24,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MockWebHost\MockWebHost.csproj" />
     <ProjectReference Include="..\Solera.MediaInfo.Service\Solera.MediaInfo.Service.csproj" />
   </ItemGroup>
 
