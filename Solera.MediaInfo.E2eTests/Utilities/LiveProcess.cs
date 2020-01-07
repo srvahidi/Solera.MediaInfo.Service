@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 
-namespace Solera.MediaInfo.E2eTests
+namespace Solera.MediaInfo.E2eTests.Utilities
 {
     public class LiveProcess : IDisposable
     {

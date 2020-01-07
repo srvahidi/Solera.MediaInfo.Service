@@ -28,4 +28,13 @@
     <ProjectReference Include="..\Solera.MediaInfo.Service\Solera.MediaInfo.Service.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="appsettings.local.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
