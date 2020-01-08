@@ -240,6 +240,31 @@ jobs:
         - -exc
         - |
           dotnet test ./Solera.MediaInfo.Test/Solera.MediaInfo.Test.csproj 
+  - task: run-e2e-tests
+    image: dotnet-image
+    config:
+      platform: linux
+      inputs:
+      - name: binaries
+      - name: git-repo
+      run:
+        path: bash        
+        args:
+        - -exc
+        - | 
+          export S3_BUCKET=e2e-test-bucket
+          export S3_ACCESS_KEY=BNDW1H4EWBFDJ36H61F3
+          export S3_SECRET_KEY=WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g
+          export RESILIENCE_POLICY_MIN_WAIT_TIME_MSECS=1000
+          export RESILIENCE_POLICY_MAX_WAIT_TIME_MSECS=3000
+          export RESILIENCE_POLICY_MAX_RETRY_COUNT=2
+          export ASPNETCORE_ENVIRONMENT=Staging
+          export ASPNETCORE_URLS=http://localhost:5005
+          cp ./git-repo/Solera.MediaInfo.E2eTests/appsettings.json ./appsettings.json
+          dotnet ./binaries/Solera.MediaInfo.Service.dll &
+          solera_mediainfo_service_pid=$!
+          SKIP_APP_START=True dotnet test ./git-repo/Solera.MediaInfo.E2eTests/Solera.MediaInfo.E2eTests.csproj 
+          kill -INT $solera_mediainfo_service_pid
   - task: publish
     image: dotnet-image
     params:
