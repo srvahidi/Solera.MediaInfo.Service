@@ -392,6 +392,46 @@ jobs:
       manifest: deployables/manifest.yml
       path: deployables
 
+- name: smoke-test-green-dev
+  on_failure:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed - Branch: ((branch-name))
+      text: Job $BUILD_JOB_NAME failed.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - in_parallel:
+    - get: utility-image    
+    - get: cf-dev
+      passed:
+        - deploy-green-dev
+      trigger: true      
+  - task: smoke-tests
+    image: utility-image
+    params:
+      <<: *dev-source
+    config:
+      platform: linux
+      run:
+        path: sh
+        args:
+        - -ec
+        - |
+          cfpass=$(printenv cf_deploy_password)
+          cfuser=$(printenv cf_deploy_user)
+          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+          set -x
+
+          app_url=$(cf app $cf_app_name-green | grep routes | sed -e 's/routes:\s*/https:\/\//')
+
+          healthcheck_status=$(curl -s -o /dev/null -w "%{http_code}" ${app_url}/api/health)
+          if [ "$healthcheck_status" != "200" ]; then
+            echo "App healthcheck did not respond with OK as expected"
+            exit 1
+          fi
+
 - name: blue-green-switch-dev
   on_success:
     put: teams-alert
@@ -414,7 +454,7 @@ jobs:
     - get: utility-image
     - get: cf-dev
       passed: 
-      - deploy-green-dev
+      - smoke-test-green-dev
       trigger: true
   - task: blue-to-green
     image: utility-image
@@ -524,6 +564,46 @@ jobs:
       manifest: deployables/manifest.yml
       path: deployables
 
+- name: smoke-test-green-qa
+  on_failure:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
+      text: Job $BUILD_JOB_NAME failed.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - in_parallel:
+    - get: utility-image 
+    - get: cf-qa      
+      passed:
+       - deploy-green-qa
+      trigger: true      
+  - task: smoke-tests
+    image: utility-image
+    params:
+      <<: *qa-source
+    config:
+      platform: linux
+      run:
+        path: sh
+        args:
+        - -ec
+        - |
+          cfpass=$(printenv cf_deploy_password)
+          cfuser=$(printenv cf_deploy_user)
+          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+          set -x
+
+          app_url=$(cf app $cf_app_name-green | grep routes | sed -e 's/routes:\s*/https:\/\//')
+
+          healthcheck_status=$(curl -s -o /dev/null -w "%{http_code}" ${app_url}/api/health)
+          if [ "$healthcheck_status" != "200" ]; then
+            echo "App healthcheck did not respond with OK as expected"
+            exit 1
+          fi
+
 - name: blue-green-switch-qa
   on_success:
     put: teams-alert
@@ -546,7 +626,7 @@ jobs:
     - get: utility-image  
     - get: cf-qa          
       passed: 
-      - deploy-green-qa
+      - smoke-test-green-qa
       trigger: true
   - task: blue-to-green
     image: utility-image
@@ -681,6 +761,46 @@ jobs:
       manifest: deployables/manifest.yml
       path: deployables
 
+- name: smoke-test-green-pcpm
+  on_failure:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
+      text: Job $BUILD_JOB_NAME failed.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - in_parallel:
+    - get: utility-image    
+    - get: cf-pcpm
+      passed:
+       - deploy-green-pcpm
+      trigger: true      
+  - task: smoke-tests
+    image: utility-image
+    params:
+      <<: *pcpm-source
+    config:
+      platform: linux
+      run:
+        path: sh
+        args:
+        - -ec
+        - |
+          cfpass=$(printenv cf_deploy_password)
+          cfuser=$(printenv cf_deploy_user)
+          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+          set -x
+
+          app_url=$(cf app $cf_app_name-green | grep routes | sed -e 's/routes:\s*/https:\/\//')
+
+          healthcheck_status=$(curl -s -o /dev/null -w "%{http_code}" ${app_url}/api/health)
+          if [ "$healthcheck_status" != "200" ]; then
+            echo "App healthcheck did not respond with OK as expected"
+            exit 1
+          fi
+
 - name: blue-green-switch-pcpm
   on_success:
     put: teams-alert
@@ -703,7 +823,7 @@ jobs:
     - get: utility-image
     - get: cf-pcpm   
       passed:
-      - deploy-green-pcpm
+      - smoke-test-green-pcpm
       trigger: true
   - task: blue-to-green
     image: utility-image
@@ -764,15 +884,18 @@ groups:
   jobs:
   - build-and-test-green
   - deploy-green-dev
+  - smoke-test-green-dev
   - blue-green-switch-dev
   - code-analysis-green
 
 - name: mis-qa
   jobs:
   - deploy-green-qa
+  - smoke-test-green-qa
   - blue-green-switch-qa
 
 - name: mis-pcpm
   jobs:
   - deploy-green-pcpm
+  - smoke-test-green-pcpm
   - blue-green-switch-pcpm
