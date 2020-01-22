@@ -34,7 +34,7 @@ source: &qa-source
       cf_space: 'integration'
       cf_env: 'dev'
       cf_preceding_space: 'development'
-      setautoscale: true
+      setautoscale: false
       instance_number: 2      
       memory: 256M
       cf_api: https://api.system-dev.gp2.axadmin.net
@@ -63,7 +63,7 @@ source: &pcpm-source
       cf_preceding_space: 'integration'
       setautoscale: true
       instance_number: 2      
-      memory: 256M
+      memory: 512M
       cf_api: https://api.system-dev.gp2.axadmin.net
       s3_access_key: BNDW1H4EWBFDJ36H61F3
       s3_bucket: rms-pcpm
@@ -108,6 +108,14 @@ resource_types:
     tag: latest
 
 resources:
+
+- name: pcpm-once-a-day
+  type: time
+  icon: calendar-clock
+  source:
+    start: 8:00 AM
+    stop: 9:00 AM
+    location: America/Chicago
 
 - name: git-repo
   type: git
@@ -519,10 +527,9 @@ jobs:
           cf login -u $cfuser -p $cfpass -a $cf_api -o $cf_organization -s $cf_space
           precedingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_preceding_appname.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
           echo "precedingversion" echo $precedingversion
-          set -x
           workingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_app_name.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
           echo "workingversion" echo $workingversion          
-
+          set -x
           if [ "$workingversion" = "$precedingversion" ]; then
           echo "Skipping deployment...New version not available for deployment"
           exit 0;
@@ -674,12 +681,21 @@ jobs:
           set -x
           if [ $setautoscale == true ]; then
             cf bind-service $cf_app_name autoscale
+            set +x
             curl -O -k -u $artifactory_username:$artifactory_password $artifactory_endpoint/devops-local/cf-plugins/autoscaler-linux32-2.0.91
+            set -x            
             cf install-plugin autoscaler-linux32-2.0.91 -f
             cf update-autoscaling-limits $cf_app_name 2 4
             cf create-autoscaling-rule $cf_app_name cpu 25 75
             cf enable-autoscaling $cf_app_name 
           fi
+
+- name: check-for-artifact
+  plan:
+  - in_parallel:    
+    - get: artifacts  
+    - get: pcpm-once-a-day
+      trigger: true
 
 - name: deploy-green-pcpm
   on_failure:
@@ -692,13 +708,18 @@ jobs:
       actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
   - get: utility-image  
-    trigger: false
+  - get: artifacts
+    trigger: true
+    passed: 
+      - check-for-artifact
   - task: prepare-manifest
     image: utility-image
     params:
       <<: *pcpm-source
     config:
       platform: linux
+      inputs:
+      - name: artifacts
       outputs:
       - name: deployables
       run:
@@ -706,37 +727,11 @@ jobs:
         args:
         - -exc
         - |  
-          set +x
-          cfpass=$(printenv cf_deploy_password)
-          cfuser=$(printenv cf_deploy_user)
-          artifactorypass=$(printenv artifactory-password)
-          artifactoryuser=$(printenv artifactory-username)
-          cfappname=$(printenv cf_app_name)                
-          
-          cf login -u $cfuser -p $cfpass -a $cf_api -o $cf_organization -s $cf_space
-          precedingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_preceding_appname.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
-          echo "precedingversion" echo $precedingversion
-          set -x
-          workingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_app_name.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
-          echo "workingversion" echo $workingversion          
-
-          if [ "$workingversion" = "$precedingversion" ]; then
-          echo "Skipping deployment...New version not available for deployment"
-          exit 0;
-          fi
-
-          index=`expr index "${precedingversion}" g`
-          git=$(echo ${precedingversion:$index})
-          artifact=$file_prefix-${precedingversion}.zip
-
-          #download zip file
-          set +x
-          curl -OL -k -u $artifactoryuser:$artifactorypass https://na-artifact-01.na.audatex.com:8443/artifactory/mobile-backend/mediainfo-service/$artifact
-          set -x
-
-          #extract zip
+          fileprefix=$(printenv file_prefix)
+          input_directory=${PWD}/artifacts
           output_directory=${PWD}/deployables
-          unzip -q $artifact -d $output_directory
+          zip_file=${fileprefix}-*.zip
+          unzip ${input_directory}/${zip_file} -d ${output_directory}
           manifest_file=${output_directory}/manifest.yml
 
           echo "Listing the directory"
@@ -871,7 +866,9 @@ jobs:
           set -x
           if [ $setautoscale == true ]; then
             cf bind-service $cf_app_name autoscale
+            set +x
             curl -O -k -u $artifactory_username:$artifactory_password $artifactory_endpoint/devops-local/cf-plugins/autoscaler-linux32-2.0.91
+            set -x
             cf install-plugin autoscaler-linux32-2.0.91 -f
             cf update-autoscaling-limits $cf_app_name 2 4
             cf create-autoscaling-rule $cf_app_name cpu 25 75
@@ -896,6 +893,7 @@ groups:
 
 - name: mis-pcpm
   jobs:
+  - check-for-artifact  
   - deploy-green-pcpm
   - smoke-test-green-pcpm
   - blue-green-switch-pcpm
