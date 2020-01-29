@@ -11,10 +11,9 @@ source: &dev-source
       instance_number: 1
       memory: 256M
       cf_api: https://api.system-dev.gp2.axadmin.net
-      s3_access_key: BNDW1H4EWBFDJ36H61F3
+      s3_access_key: ((s3-access-key))
       s3_bucket: rms-development
-      s3_secret_key: WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g
-      s3_url: https://s3.gp2.axadmin.net
+      s3_secret_key: ((s3-secret-key))
       resilience_policy_min_wait_time_msecs: 1000
       resilience_policy_max_wait_time_msecs: 20000
       resilience_policy_max_retry_count: 3
@@ -38,10 +37,9 @@ source: &qa-source
       instance_number: 2      
       memory: 256M
       cf_api: https://api.system-dev.gp2.axadmin.net
-      s3_access_key: BNDW1H4EWBFDJ36H61F3
+      s3_access_key: ((s3-access-key))
       s3_bucket: rms-integration
-      s3_secret_key: WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g
-      s3_url: https://s3.gp2.axadmin.net
+      s3_secret_key: ((s3-secret-key))
       resilience_policy_min_wait_time_msecs: 1000
       resilience_policy_max_wait_time_msecs: 20000
       resilience_policy_max_retry_count: 3
@@ -65,10 +63,9 @@ source: &pcpm-source
       instance_number: 2      
       memory: 512M
       cf_api: https://api.system-dev.gp2.axadmin.net
-      s3_access_key: BNDW1H4EWBFDJ36H61F3
+      s3_access_key: ((s3-access-key))
       s3_bucket: rms-pcpm
-      s3_secret_key: WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g
-      s3_url: https://s3.gp2.axadmin.net
+      s3_secret_key: ((s3-secret-key))
       resilience_policy_min_wait_time_msecs: 1000
       resilience_policy_max_wait_time_msecs: 20000
       resilience_policy_max_retry_count: 3
@@ -260,9 +257,11 @@ jobs:
         args:
         - -exc
         - | 
+          set +x
+          export S3_ACCESS_KEY=((s3-access-key))
+          export S3_SECRET_KEY=((s3-secret-key))
+          set -x
           export S3_BUCKET=e2e-test-bucket
-          export S3_ACCESS_KEY=BNDW1H4EWBFDJ36H61F3
-          export S3_SECRET_KEY=WClsE8kfoP8g29yCyF6BtZeukbnEwMzVWPVDO03g
           export RESILIENCE_POLICY_MIN_WAIT_TIME_MSECS=1000
           export RESILIENCE_POLICY_MAX_WAIT_TIME_MSECS=3000
           export RESILIENCE_POLICY_MAX_RETRY_COUNT=2
@@ -387,11 +386,12 @@ jobs:
           sed -i -e "s/\[instances\]/${instance_number}/" ${manifest_file}
           sed -i -e "s/\[memory\]/${memory}/" ${manifest_file}
           sed -i -e "s/\[newrelic_app_name\]/${cf_app_name}/" ${manifest_file}
-          sed -i -e "s/\[newrelic_app_lic\]/${newrelic_app_lic}/" ${manifest_file}
+          sed -i -e "s/\[newrelic_app_lic\]/${newrelic_app_lic}/" ${manifest_file}          
+          set +x
           sed -i -e "s/\[s3_access_key\]/${s3_access_key}/" ${manifest_file}
-          sed -i -e "s/\[s3_bucket\]/${s3_bucket}/" ${manifest_file}
           sed -i -e "s/\[s3_secret_key\]/${s3_secret_key}/" ${manifest_file}
-          sed -i -e "s~\[s3_url\]~${s3_url}~" ${manifest_file}
+          set -x
+          sed -i -e "s/\[s3_bucket\]/${s3_bucket}/" ${manifest_file}
           sed -i -e "s/\[resilience_policy_min_wait_time_msecs\]/${resilience_policy_min_wait_time_msecs}/" ${manifest_file}
           sed -i -e "s/\[resilience_policy_max_wait_time_msecs\]/${resilience_policy_max_wait_time_msecs}/" ${manifest_file}
           sed -i -e "s/\[resilience_policy_max_retry_count\]/${resilience_policy_max_retry_count}/" ${manifest_file}

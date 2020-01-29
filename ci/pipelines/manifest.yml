@@ -13,7 +13,6 @@ applications:
     S3_ACCESS_KEY: [s3_access_key]
     S3_BUCKET: [s3_bucket]
     S3_SECRET_KEY: [s3_secret_key]
-    S3_URL: [s3_url]
     RESILIENCE_POLICY_MIN_WAIT_TIME_MSECS: [resilience_policy_min_wait_time_msecs]
     RESILIENCE_POLICY_MAX_WAIT_TIME_MSECS: [resilience_policy_max_wait_time_msecs]
     RESILIENCE_POLICY_MAX_RETRY_COUNT: [resilience_policy_max_retry_count]  
