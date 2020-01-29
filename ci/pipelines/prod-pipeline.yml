@@ -18,10 +18,9 @@ source: &demo-source
       setautoscale: true
       cf_api: https://api.system-prod.gp2.axadmin.net
       aspnetcore_environment: Demo
-      s3_access_key: EIFNLJ0J8IOQ21M9YVO3
+      s3_access_key: ((s3-access-key))
       s3_bucket: rms-demo
-      s3_secret_key: AJ2k9MmjbHFnLzEawimFUzasOxp68RirLxH2OuNa
-      s3_url: https://s3.gp2.axadmin.net
+      s3_secret_key: ((s3-secret-key))
       resilience_policy_min_wait_time_msecs: 1000
       resilience_policy_max_wait_time_msecs: 20000
       resilience_policy_max_retry_count: 3
@@ -48,10 +47,9 @@ source: &prod-source
       setautoscale: true
       cf_api: https://api.system-prod.gp2.axadmin.net
       aspnetcore_environment: Production
-      s3_access_key: EIFNLJ0J8IOQ21M9YVO3
+      s3_access_key: ((s3-access-key))
       s3_bucket: rms-prod
-      s3_secret_key: AJ2k9MmjbHFnLzEawimFUzasOxp68RirLxH2OuNa
-      s3_url: https://s3.gp2.axadmin.net
+      s3_secret_key: ((s3-secret-key))
       resilience_policy_min_wait_time_msecs: 1000
       resilience_policy_max_wait_time_msecs: 20000
       resilience_policy_max_retry_count: 3
@@ -188,9 +186,11 @@ jobs:
           sed -i -e "s/\[memory\]/${memory}/" ${manifest_file}
           sed -i -e "s/\[newrelic_app_name\]/${cf_app_name}/" ${manifest_file}
           sed -i -e "s/\[newrelic_app_lic\]/${newrelic_app_lic}/" ${manifest_file}
+          set +x
           sed -i -e "s/\[s3_access_key\]/${s3_access_key}/" ${manifest_file}
-          sed -i -e "s/\[s3_bucket\]/${s3_bucket}/" ${manifest_file}
           sed -i -e "s/\[s3_secret_key\]/${s3_secret_key}/" ${manifest_file}
+          set -x
+          sed -i -e "s/\[s3_bucket\]/${s3_bucket}/" ${manifest_file}
           sed -i -e "s~\[s3_url\]~${s3_url}~" ${manifest_file}
           sed -i -e "s/\[resilience_policy_min_wait_time_msecs\]/${resilience_policy_min_wait_time_msecs}/" ${manifest_file}
           sed -i -e "s/\[resilience_policy_max_wait_time_msecs\]/${resilience_policy_max_wait_time_msecs}/" ${manifest_file}
@@ -387,10 +387,11 @@ jobs:
           sed -i -e "s/\[memory\]/${memory}/" ${manifest_file}
           sed -i -e "s/\[newrelic_app_name\]/${cf_app_name}/" ${manifest_file}
           sed -i -e "s/\[newrelic_app_lic\]/${newrelic_app_lic}/" ${manifest_file}
+          set +x
           sed -i -e "s/\[s3_access_key\]/${s3_access_key}/" ${manifest_file}
-          sed -i -e "s/\[s3_bucket\]/${s3_bucket}/" ${manifest_file}
           sed -i -e "s/\[s3_secret_key\]/${s3_secret_key}/" ${manifest_file}
-          sed -i -e "s~\[s3_url\]~${s3_url}~" ${manifest_file}
+          set -x
+          sed -i -e "s/\[s3_bucket\]/${s3_bucket}/" ${manifest_file}
           sed -i -e "s/\[resilience_policy_min_wait_time_msecs\]/${resilience_policy_min_wait_time_msecs}/" ${manifest_file}
           sed -i -e "s/\[resilience_policy_max_wait_time_msecs\]/${resilience_policy_max_wait_time_msecs}/" ${manifest_file}
           sed -i -e "s/\[resilience_policy_max_retry_count\]/${resilience_policy_max_retry_count}/" ${manifest_file}
