@@ -11,7 +11,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Solera.MediaInfo.Service.Test
+namespace Solera.MediaInfo.Test.Unit.Middleware
 {
     [Trait("Category", "Unit")]
     public class ExceptionMiddlewareTests : IDisposable
