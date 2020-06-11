@@ -8,7 +8,7 @@ using Solera.MediaInfo.Service.Middleware;
 using System;
 using Xunit;
 
-namespace Solera.MediaInfo.Test.Extensions
+namespace Solera.MediaInfo.Test.Unit.Extensions
 {
     [Trait("Category", "Unit")]
     public class ExceptionMiddlewareExtensionsTests

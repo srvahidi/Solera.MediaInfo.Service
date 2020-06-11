@@ -74,7 +74,7 @@ namespace Solera.MediaInfo.Service.Controllers
                 var policyAsync = polyRegistry.Get<IAsyncPolicy>("mbePolicy");
                 await policyAsync.ExecuteAsync(async () =>
                 {
-                    await callFileTransfer(fileTransferUtility, fileTransferUtilityRequest);
+                    await CallFileTransfer(fileTransferUtility, fileTransferUtilityRequest);
                 });
 
                 string imageUrl = $"{_s3Client.Config.ServiceURL}/{_s3bucket}/{uploadFileRequest.TargetPath}/{uploadFileRequest.File.FileName}";
@@ -84,20 +84,20 @@ namespace Solera.MediaInfo.Service.Controllers
             }
         }
 
-        private async Task callFileTransfer(ITransferUtility transferutility, TransferUtilityUploadRequest filetransferuploadrequest)
+        private async Task CallFileTransfer(ITransferUtility transferUtility, TransferUtilityUploadRequest fileTransferUploadRequest)
         {
             try
             {
-                await transferutility.UploadAsync(filetransferuploadrequest);
+                await transferUtility.UploadAsync(fileTransferUploadRequest);
             }
             catch (AmazonS3Exception ex)
             {
-                _logger.LogError(ex, $"Error when uploading {filetransferuploadrequest.Key}");
+                _logger.LogError(ex, $"Error when uploading {fileTransferUploadRequest.Key}");
                 throw;
             }
             catch (WebException ex)
             {
-                _logger.LogError(ex, $"Error when uploading {filetransferuploadrequest.Key}");
+                _logger.LogError(ex, $"Error when uploading {fileTransferUploadRequest.Key}");
                 throw;
             }
 
