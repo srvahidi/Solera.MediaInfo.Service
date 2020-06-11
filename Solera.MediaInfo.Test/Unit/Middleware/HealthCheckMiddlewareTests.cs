@@ -11,7 +11,7 @@ using System;
 using System.IO;
 using Xunit;
 
-namespace Solera.MediaInfo.Test.Middleware
+namespace Solera.MediaInfo.Test.Unit.Middleware
 {
     [Trait("Category", "Unit")]
     public class HealthCheckMiddlewareTests : IDisposable

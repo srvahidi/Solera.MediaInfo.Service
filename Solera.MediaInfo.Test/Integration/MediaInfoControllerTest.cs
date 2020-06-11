@@ -20,9 +20,9 @@ using System.Net;
 using System.Threading;
 using Xunit;
 
-namespace Solera.MediaInfo.Service.Test
+namespace Solera.MediaInfo.Test.Integration
 {
-    [Trait("Category", "Unit")]
+    [Trait("Category", "Integration")]
     public class MediaInfoControllerTest
     {
         #region Private members
