@@ -71,7 +71,7 @@ source: &pcpm-source
       resilience_policy_max_retry_count: 3
       cf_organization: mobile_backend
       teams_url: ((teams-webhook-url))
-      newrelic_app_lic: ''
+      newrelic_app_lic: 'e575f6ebb7f8821308cbea10b3817a8bcbe0NRAL'
       buildpack_one: '- newrelic_dotnet_core_buildpack_latest'
       buildpack_two: '- dotnet_core_buildpack'
 
