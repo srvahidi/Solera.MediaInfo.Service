@@ -1,0 +1,18 @@
+---
+applications:
+- name: [app_name]
+  instances: [instances]
+  memory: [memory]
+  no-route: false
+  buildpacks:
+    [buildpack_one]
+    [buildpack_two]
+  env:
+    NEW_RELIC_APP_NAME: [newrelic_app_name]
+    NEW_RELIC_LICENSE_KEY: [newrelic_app_lic]
+    S3_ACCESS_KEY: [s3_access_key]
+    S3_BUCKET: [s3_bucket]
+    S3_SECRET_KEY: [s3_secret_key]
+    RESILIENCE_POLICY_MIN_WAIT_TIME_MSECS: [resilience_policy_min_wait_time_msecs]
+    RESILIENCE_POLICY_MAX_WAIT_TIME_MSECS: [resilience_policy_max_wait_time_msecs]
+    RESILIENCE_POLICY_MAX_RETRY_COUNT: [resilience_policy_max_retry_count]  

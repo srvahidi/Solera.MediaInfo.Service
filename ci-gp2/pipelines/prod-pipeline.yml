@@ -1,0 +1,532 @@
+---
+source: &demo-source
+      cf_deploy_user: ((cf-prd-username))
+      cf_deploy_password: ((cf-prd-password))      
+      artifactory-username: ((artifactory-username))
+      artifactory-password: ((artifactory-password))
+      cf_app_name: mis-demo
+      file_prefix: 'mediainfosvc'
+      cf_space: 'demo'
+      cf_env: 'prod'
+      cf_preceding_space: pcpm
+      cf_preceding_appname: mis-pcpm
+      cf_preceding_env: dev
+      cf_dev_password: ((cf-dev-deploy-password))
+      cf_dev_user: ((cf-dev-deploy-user))
+      instance_number: 2
+      memory: 512M
+      setautoscale: true
+      cf_api: https://api.system-prod.gp2.axadmin.net
+      aspnetcore_environment: Demo
+      s3_access_key: ((s3-access-key))
+      s3_bucket: rms-demo
+      s3_secret_key: ((s3-secret-key))
+      resilience_policy_min_wait_time_msecs: 1000
+      resilience_policy_max_wait_time_msecs: 20000
+      resilience_policy_max_retry_count: 3
+      cf_organization: mobile_backend
+      teams_url: ((teams-webhook-url))
+      newrelic_app_lic: ((newrelic-license-key))
+      buildpack_one: ''
+      buildpack_two: '- dotnet_core_buildpack'
+
+source: &prod-source
+      cf_deploy_user: ((cf-prd-username))
+      cf_deploy_password: ((cf-prd-password))      
+      artifactory-username: ((artifactory-username))
+      artifactory-password: ((artifactory-password))
+      cf_app_name: mis-prod
+      file_prefix: 'mediainfosvc'
+      cf_space: 'production'
+      cf_env: 'prod'
+      cf_preceding_space: demo
+      cf_preceding_appname: mis-demo
+      cf_preceding_env: dev          
+      instance_number: 2
+      memory: 1G
+      setautoscale: true
+      cf_api: https://api.system-prod.gp2.axadmin.net
+      aspnetcore_environment: Production
+      s3_access_key: ((s3-access-key))
+      s3_bucket: rms-prod
+      s3_secret_key: ((s3-secret-key))
+      resilience_policy_min_wait_time_msecs: 1000
+      resilience_policy_max_wait_time_msecs: 20000
+      resilience_policy_max_retry_count: 3
+      cf_organization: mobile_backend
+      teams_url: ((teams-webhook-url))
+      newrelic_app_lic: ((newrelic-license-key))
+      buildpack_one: '- newrelic_dotnet_core_buildpack_latest'
+      buildpack_two: '- dotnet_core_buildpack'
+
+resource_types:
+- name: teams-notification
+  type: docker-image
+  source:
+    repository: navicore/teams-notification-resource
+    tag: latest
+
+- name: cf-resource
+  type: docker-image
+  source:
+    repository: ((internal-docker-addr))/gdc/cf-resource
+    username: ((internal-docker-user))
+    password: ((internal-docker-pass))
+    tag: latest
+
+resources:   
+
+- name: cf-demo
+  type: cf-resource
+  source:
+    api: ((cf-prd-api))
+    username: ((cf-prd-username))
+    password: ((cf-prd-password))
+    organization: mobile_backend
+    space: demo
+    skip_cert_check: true
+
+- name: cf-prod
+  type: cf-resource
+  source:
+    api: ((cf-prd-api))
+    username: ((cf-prd-username))
+    password: ((cf-prd-password))
+    organization: mobile_backend
+    space: production
+    skip_cert_check: true
+
+- name: utility-image
+  type: docker-image
+  source:
+    repository: ((internal-docker-addr))/gdc/mobile-backend/mobile-utility
+    username: ((internal-docker-user))
+    password: ((internal-docker-pass))
+    tag: "latest"
+
+- name: teams-alert
+  type: teams-notification
+  source:
+    url: ((teams-webhook-url))
+
+jobs:
+
+- name: deploy-green-demo
+  on_failure:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
+      text: Job $BUILD_JOB_NAME failed.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - get: utility-image
+    trigger: false    
+  - task: prepare-manifest
+    image: utility-image
+    params:
+      <<: *demo-source
+    config:
+      platform: linux
+      outputs:
+      - name: deployables
+      run:
+        path: sh
+        args:
+        - -exc
+        - |  
+          set +x
+          cfpass=$(printenv cf_deploy_password)
+          cfuser=$(printenv cf_deploy_user)
+          artifactorypass=$(printenv artifactory-password)
+          artifactoryuser=$(printenv artifactory-username)
+          cfappname=$(printenv cf_app_name)                
+          
+          if [ "$cf_space" == "demo" ]; then
+            cf login -u $cf_dev_user -p $cf_dev_password -a https://api.system-$cf_preceding_env.gp2.axadmin.net -o $cf_organization -s $cf_preceding_space
+            precedingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_preceding_appname.apps-$cf_preceding_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+            cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+            workingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_app_name.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+            set -x            
+          else
+            cf login -u $cfuser -p $cfpass -a $cf_api -o $cf_organization -s $cf_space
+            precedingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_preceding_appname.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+            echo "precedingversion" echo $precedingversion
+            workingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_app_name.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+            set -x            
+            echo "workingversion" echo $workingversion
+          fi
+          
+          if [ "$workingversion" = "$precedingversion" ]; then
+          echo "Skipping deployment...New version not available for deployment"
+          exit 0;
+          fi
+          index=`expr index "${precedingversion}" g`
+          git=$(echo ${precedingversion:$index})
+          artifact=$file_prefix-${precedingversion}.zip
+
+          #download zip file
+          set +x
+          curl -OL -k -u $artifactoryuser:$artifactorypass https://na-artifact-01.na.audatex.com:8443/artifactory/mobile-backend/mediainfo-service/$artifact
+          set -x
+
+          #extract zip
+          output_directory=${PWD}/deployables
+          unzip -q $artifact -d $output_directory
+          manifest_file=${output_directory}/manifest.yml
+
+          echo "Listing the directory"
+          ls -a
+          echo "Listing the directory-End"
+          sed -i -e "s/\[buildpack_one\]/${buildpack_one}/" ${manifest_file}
+          sed -i -e "s/\[buildpack_two\]/${buildpack_two}/" ${manifest_file}
+          sed -i -e "s/\[app_name\]/${cf_app_name}-green/" ${manifest_file}
+          sed -i -e "s/\[instances\]/${instance_number}/" ${manifest_file}
+          sed -i -e "s/\[memory\]/${memory}/" ${manifest_file}
+          sed -i -e "s/\[newrelic_app_name\]/${cf_app_name}/" ${manifest_file}
+          sed -i -e "s/\[newrelic_app_lic\]/${newrelic_app_lic}/" ${manifest_file}
+          set +x
+          sed -i -e "s/\[s3_access_key\]/${s3_access_key}/" ${manifest_file}
+          sed -i -e "s/\[s3_secret_key\]/${s3_secret_key}/" ${manifest_file}
+          set -x
+          sed -i -e "s/\[s3_bucket\]/${s3_bucket}/" ${manifest_file}
+          sed -i -e "s/\[resilience_policy_min_wait_time_msecs\]/${resilience_policy_min_wait_time_msecs}/" ${manifest_file}
+          sed -i -e "s/\[resilience_policy_max_wait_time_msecs\]/${resilience_policy_max_wait_time_msecs}/" ${manifest_file}
+          sed -i -e "s/\[resilience_policy_max_retry_count\]/${resilience_policy_max_retry_count}/" ${manifest_file}
+  - put: cf-demo
+    params:
+      manifest: deployables/manifest.yml
+      path: deployables
+
+- name: smoke-test-green-demo
+  on_failure:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
+      text: Job $BUILD_JOB_NAME failed.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - in_parallel:
+    - get: utility-image 
+    - get: cf-demo
+      passed:
+       - deploy-green-demo
+      trigger: true
+  - task: smoke-tests
+    image: utility-image
+    params:
+      <<: *demo-source
+    config:
+      platform: linux
+      run:
+        path: sh
+        args:
+        - -ec
+        - |
+          cfpass=$(printenv cf_deploy_password)
+          cfuser=$(printenv cf_deploy_user)
+          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+          set -x
+
+          app_url=$(cf app $cf_app_name-green | grep routes | sed -e 's/routes:\s*/https:\/\//')
+
+          healthcheck_status=$(curl -s -o /dev/null -w "%{http_code}" ${app_url}/api/health)
+          if [ "$healthcheck_status" != "200" ]; then
+            echo "App healthcheck did not respond with OK as expected"
+            exit 1
+          fi
+ 
+- name: blue-green-switch-demo
+  on_success:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME Demo deployed successfully
+      text: Job $BUILD_JOB_NAME successful.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  on_failure:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
+      text: Job $BUILD_JOB_NAME failed.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - in_parallel:
+    - get: utility-image
+    - get: cf-demo
+      passed: 
+      - smoke-test-green-demo
+      trigger: true
+  - task: blue-to-green
+    image: utility-image
+    params: 
+      <<: *demo-source 
+    config:
+      platform: linux
+      run:
+        path: sh
+        args:
+        - -exc
+        - |  
+          set +x
+          cfpass=$(printenv cf_deploy_password)
+          cfuser=$(printenv cf_deploy_user)
+          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+          set -x
+          greenApps=$(cf apps | grep $cf_app_name-green | { grep -v grep || true; })
+          if [[ -z $greenApps ]]; then exit 0; fi
+          cf map-route $cf_app_name-green apps-$cf_env.gp2.axadmin.net -n $cf_app_name
+          cf unmap-route $cf_app_name apps-$cf_env.gp2.axadmin.net -n $cf_app_name
+          cf unmap-route $cf_app_name-green apps-$cf_env.gp2.axadmin.net -n $cf_app_name-green
+          cf stop $cf_app_name
+          cf delete $cf_app_name -f
+          # Remove the Green-Temp-Route.
+          cf delete-route apps-$cf_env.gp2.axadmin.net --hostname $cf_app_name-green -f
+          # Rename Green app to Blue app.
+          cf rename $cf_app_name-green $cf_app_name
+  - task: autoscaling
+    image: utility-image
+    params: 
+      <<: *demo-source 
+      artifactory_endpoint:  https://na-artifact-01.na.audatex.com:8443/artifactory
+      artifactory_username: ((artifactory-username))
+      artifactory_password: ((artifactory-password))   
+    config:
+      platform: linux      
+      run:
+        path: sh
+        args: 
+        - -exc
+        - |
+          set +x
+          cf login -u $cf_deploy_user -p $cf_deploy_password -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+          set -x
+          if [ $setautoscale == true ]; then
+            cf bind-service $cf_app_name autoscale
+            set +x
+            curl -O -k -u $artifactory_username:$artifactory_password $artifactory_endpoint/devops-local/cf-plugins/autoscaler-linux32-2.0.91
+            set -x
+            cf install-plugin autoscaler-linux32-2.0.91 -f
+            cf update-autoscaling-limits $cf_app_name 2 4
+            cf create-autoscaling-rule $cf_app_name cpu 25 75
+            cf enable-autoscaling $cf_app_name 
+          fi
+
+- name: deploy-green-prod
+  on_failure:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
+      text: Job $BUILD_JOB_NAME failed.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - get: utility-image
+    trigger: false    
+  - task: prepare-manifest
+    image: utility-image
+    params:
+      <<: *prod-source
+    config:
+      platform: linux
+      outputs:
+      - name: deployables
+      run:
+        path: sh
+        args:
+        - -exc
+        - |  
+          set +x
+          cfpass=$(printenv cf_deploy_password)
+          cfuser=$(printenv cf_deploy_user)
+          artifactorypass=$(printenv artifactory-password)
+          artifactoryuser=$(printenv artifactory-username)
+          cfappname=$(printenv cf_app_name)                
+          
+          cf login -u $cfuser -p $cfpass -a $cf_api -o $cf_organization -s $cf_space
+          precedingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_preceding_appname.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+          echo "precedingversion" echo $precedingversion
+          workingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_app_name.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+          set -x
+          echo "workingversion" echo $workingversion          
+
+          if [ "$workingversion" = "$precedingversion" ]; then
+          echo "Skipping deployment...New version not available for deployment"
+          exit 0;
+          fi
+
+          index=`expr index "${precedingversion}" g`
+          git=$(echo ${precedingversion:$index})
+          artifact=$file_prefix-${precedingversion}.zip
+
+          #download zip file
+          set +x
+          curl -OL -k -u $artifactoryuser:$artifactorypass https://na-artifact-01.na.audatex.com:8443/artifactory/mobile-backend/mediainfo-service/$artifact
+          set -x
+
+          #extract zip
+          output_directory=${PWD}/deployables
+          unzip -q $artifact -d $output_directory
+          manifest_file=${output_directory}/manifest.yml
+
+          echo "Listing the directory"
+          ls -a
+          echo "Listing the directory-End"
+          sed -i -e "s/\[buildpack_one\]/${buildpack_one}/" ${manifest_file}
+          sed -i -e "s/\[buildpack_two\]/${buildpack_two}/" ${manifest_file}
+          sed -i -e "s/\[app_name\]/${cf_app_name}-green/" ${manifest_file}
+          sed -i -e "s/\[instances\]/${instance_number}/" ${manifest_file}
+          sed -i -e "s/\[memory\]/${memory}/" ${manifest_file}
+          sed -i -e "s/\[newrelic_app_name\]/${cf_app_name}/" ${manifest_file}
+          sed -i -e "s/\[newrelic_app_lic\]/${newrelic_app_lic}/" ${manifest_file}
+          set +x
+          sed -i -e "s/\[s3_access_key\]/${s3_access_key}/" ${manifest_file}
+          sed -i -e "s/\[s3_secret_key\]/${s3_secret_key}/" ${manifest_file}
+          set -x
+          sed -i -e "s/\[s3_bucket\]/${s3_bucket}/" ${manifest_file}
+          sed -i -e "s/\[resilience_policy_min_wait_time_msecs\]/${resilience_policy_min_wait_time_msecs}/" ${manifest_file}
+          sed -i -e "s/\[resilience_policy_max_wait_time_msecs\]/${resilience_policy_max_wait_time_msecs}/" ${manifest_file}
+          sed -i -e "s/\[resilience_policy_max_retry_count\]/${resilience_policy_max_retry_count}/" ${manifest_file}
+  - put: cf-prod
+    params:
+      manifest: deployables/manifest.yml
+      path: deployables
+
+- name: smoke-test-green-prod
+  on_failure:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
+      text: Job $BUILD_JOB_NAME failed.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - in_parallel:
+    - get: utility-image 
+    - get: cf-prod
+      passed:
+       - deploy-green-prod
+      trigger: true
+  - task: smoke-tests
+    image: utility-image
+    params:
+      <<: *prod-source
+    config:
+      platform: linux
+      run:
+        path: sh
+        args:
+        - -ec
+        - |
+          cfpass=$(printenv cf_deploy_password)
+          cfuser=$(printenv cf_deploy_user)
+          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+          set -x
+
+          app_url=$(cf app $cf_app_name-green | grep routes | sed -e 's/routes:\s*/https:\/\//')
+
+          healthcheck_status=$(curl -s -o /dev/null -w "%{http_code}" ${app_url}/api/health)
+          if [ "$healthcheck_status" != "200" ]; then
+            echo "App healthcheck did not respond with OK as expected"
+            exit 1
+          fi
+
+- name: blue-green-switch-prod
+  on_success:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME Prod deployed successfully
+      text: Job $BUILD_JOB_NAME successful.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  on_failure:
+    put: teams-alert
+    params:
+      title: |
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
+      text: Job $BUILD_JOB_NAME failed.
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+  plan:
+  - in_parallel:
+    - get: utility-image
+    - get: cf-prod
+      passed: 
+        - smoke-test-green-prod
+      trigger: true
+  - task: blue-to-green
+    image: utility-image
+    params: 
+      <<: *prod-source 
+    config:
+      platform: linux
+      run:
+        path: sh
+        args:
+        - -exc
+        - |  
+          set +x
+          cfpass=$(printenv cf_deploy_password)
+          cfuser=$(printenv cf_deploy_user)
+          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+          set -x
+          greenApps=$(cf apps | grep $cf_app_name-green | { grep -v grep || true; })
+          if [[ -z $greenApps ]]; then exit 0; fi
+          cf map-route $cf_app_name-green apps-$cf_env.gp2.axadmin.net -n $cf_app_name
+          cf unmap-route $cf_app_name apps-$cf_env.gp2.axadmin.net -n $cf_app_name
+          cf unmap-route $cf_app_name-green apps-$cf_env.gp2.axadmin.net -n $cf_app_name-green
+          cf stop $cf_app_name
+          cf delete $cf_app_name -f
+          # Remove the Green-Temp-Route.
+          cf delete-route apps-$cf_env.gp2.axadmin.net --hostname $cf_app_name-green -f
+          # Rename Green app to Blue app.
+          cf rename $cf_app_name-green $cf_app_name
+  - task: autoscaling
+    image: utility-image
+    params: 
+      <<: *prod-source 
+      artifactory_endpoint:  https://na-artifact-01.na.audatex.com:8443/artifactory
+      artifactory_username: ((artifactory-username))
+      artifactory_password: ((artifactory-password))   
+    config:
+      platform: linux      
+      run:
+        path: sh
+        args: 
+        - -exc
+        - |
+          set +x
+          cf login -u $cf_deploy_user -p $cf_deploy_password -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+          set -x
+          if [ $setautoscale == true ]; then
+            cf bind-service $cf_app_name autoscale
+            set +x
+            curl -O -k -u $artifactory_username:$artifactory_password $artifactory_endpoint/devops-local/cf-plugins/autoscaler-linux32-2.0.91
+            set -x
+            cf install-plugin autoscaler-linux32-2.0.91 -f
+            cf update-autoscaling-limits $cf_app_name 2 4
+            cf create-autoscaling-rule $cf_app_name cpu 25 75
+            cf enable-autoscaling $cf_app_name 
+          fi
+groups:
+
+- name: mis-demo
+  jobs:
+  - deploy-green-demo
+  - smoke-test-green-demo
+  - blue-green-switch-demo
+
+- name: mis-prod
+  jobs:
+  - deploy-green-prod
+  - smoke-test-green-prod
+  - blue-green-switch-prod
