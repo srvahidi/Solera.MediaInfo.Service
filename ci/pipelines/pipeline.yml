@@ -91,17 +91,17 @@ resource_types:
 - name: project-metrics
   type: docker-image
   source:
-    repository: ((internal-docker-addr))/gdc/concourse-projectmetrics-resource
-    username: ((internal-docker-user))
-    password: ((internal-docker-pass))
+    repository: ((proget-url))/gdc/concourse-projectmetrics-resource
+    username: ((proget-user))
+    password: ((proget-password))
     tag: latest
 
 - name: cf-resource
   type: docker-image
   source:
-    repository: ((internal-docker-addr))/gdc/cf-resource
-    username: ((internal-docker-user))
-    password: ((internal-docker-pass))
+    repository: ((proget-url))/gdc/cf-resource
+    username: ((proget-user))
+    password: ((proget-password))
     tag: latest
 
 resources:
@@ -137,17 +137,17 @@ resources:
 - name: dotnet-image
   type: docker-image
   source:
-    repository: ((internal-docker-addr))/gdc/mobile-backend/mobile-dotnet2.1
-    username: ((internal-docker-user))
-    password: ((internal-docker-pass))
+    repository: ((proget-url))/gdc/mobile-backend/mobile-dotnet2.1
+    username: ((proget-user))
+    password: ((proget-password))
     tag: "latest"
 
 - name: utility-image
   type: docker-image
   source:
-    repository: ((internal-docker-addr))/gdc/mobile-backend/mobile-utility
-    username: ((internal-docker-user))
-    password: ((internal-docker-pass))
+    repository: ((proget-url))/gdc/mobile-backend/mobile-utility
+    username: ((proget-user))
+    password: ((proget-password))
     tag: "latest"
 
 - name: cf-dev
