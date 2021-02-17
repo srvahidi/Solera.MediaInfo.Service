@@ -71,7 +71,7 @@ source: &pcpm-source
       resilience_policy_max_retry_count: 3
       cf_organization: mobile_backend
       teams_url: ((teams-webhook-url))
-      newrelic_app_lic: ''
+      newrelic_app_lic: ((newrelic-license-key))
       buildpack_one: '- newrelic_dotnet_core_buildpack_latest'
       buildpack_two: '- dotnet_core_buildpack'
 
@@ -88,10 +88,10 @@ resource_types:
     repository: navicore/teams-notification-resource
     tag: latest
 
-- name: project-metrics
+- name: app-docker-image
   type: docker-image
   source:
-    repository: ((proget-url))/gdc/concourse-projectmetrics-resource
+    repository: ((proget-url))/docker/((docker-image-path))
     username: ((proget-user))
     password: ((proget-password))
     tag: latest
@@ -99,7 +99,7 @@ resource_types:
 - name: cf-resource
   type: docker-image
   source:
-    repository: ((proget-url))/gdc/cf-resource
+    repository: ((proget-url))/docker/gdc/cf-resource
     username: ((proget-user))
     password: ((proget-password))
     tag: latest
@@ -137,15 +137,15 @@ resources:
 - name: dotnet-image
   type: docker-image
   source:
-    repository: ((proget-url))/gdc/mobile-backend/mobile-dotnet2.1
+    repository: ((proget-url))/docker/rms/mobile-backend/mobile-dotnet2.2
     username: ((proget-user))
     password: ((proget-password))
     tag: "latest"
-
+ 
 - name: utility-image
   type: docker-image
   source:
-    repository: ((proget-url))/gdc/mobile-backend/mobile-utility
+    repository: ((proget-url))/docker/rms/mobile-backend/mobile-utility
     username: ((proget-user))
     password: ((proget-password))
     tag: "latest"
