@@ -519,13 +519,13 @@ jobs:
           fi
 groups:
 
-- name: mis-demo
+- name: mediainfo-service-demo
   jobs:
   - deploy-green-demo
   - smoke-test-green-demo
   - blue-green-switch-demo
 
-- name: mis-prod
+- name: mediainfo-service-prod
   jobs:
   - deploy-green-prod
   - smoke-test-green-prod
