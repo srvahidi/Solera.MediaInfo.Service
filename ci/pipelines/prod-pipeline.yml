@@ -139,7 +139,7 @@ jobs:
   plan:
   - in_parallel:
     - get: utility-image
-    - get: mbe-wrapper-artifact
+    - get: artifact
       trigger: true
   - task: prepare-manifest
     image: utility-image
@@ -307,57 +307,32 @@ jobs:
     put: teams-alert
     params:
       title: |
-        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
+        $BUILD_PIPELINE_NAME Demo-Green Deploy Failed - Branch: ((branch-name))
       text: Job $BUILD_JOB_NAME failed.
       actionName: View Job $BUILD_JOB_NAME Results
       actionTarget: https://concourse-prod.usdc10.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
-  - get: utility-image
-    trigger: false    
+  - in_parallel:
+    - get: utility-image
+    - get: artifact
+      trigger: true
   - task: prepare-manifest
     image: utility-image
     params:
-      <<: *prod-source
+      <<: *demo-source
     config:
       platform: linux
+      inputs:
+      - name: mbe-wrapper-artifact
       outputs:
       - name: deployables
       run:
         path: sh
         args:
         - -exc
-        - |  
-          set +x
-          cfpass=$(printenv cf_deploy_password)
-          cfuser=$(printenv cf_deploy_user)
-          artifactorypass=$(printenv artifactory-password)
-          artifactoryuser=$(printenv artifactory-username)
-          cfappname=$(printenv cf_app_name)                
-          
-          cf login -u $cfuser -p $cfpass -a $cf_api -o $cf_organization -s $cf_space
-          precedingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_preceding_appname.apps-$cf_env.usdc10.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
-          echo "precedingversion" echo $precedingversion
-          workingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_app_name.apps-$cf_env.usdc10.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
-          set -x
-          echo "workingversion" echo $workingversion          
-
-          if [ "$workingversion" = "$precedingversion" ]; then
-          echo "Skipping deployment...New version not available for deployment"
-          exit 0;
-          fi
-
-          index=`expr index "${precedingversion}" g`
-          git=$(echo ${precedingversion:$index})
-          artifact=$file_prefix-${precedingversion}.zip
-
-          #download zip file
-          set +x
-          curl -OL -k -u $artifactoryuser:$artifactorypass https://na-artifact-01.na.audatex.com:8443/artifactory/mobile-backend/mediainfo-service/$artifact
-          set -x
-
-          #extract zip
+        - |
           output_directory=${PWD}/deployables
-          unzip -q $artifact -d $output_directory
+          unzip ${PWD}/artifact/mediainfosvc-*.zip -d ${output_directory}
           manifest_file=${output_directory}/manifest.yml
 
           echo "Listing the directory"
