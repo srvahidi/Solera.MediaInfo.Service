@@ -307,7 +307,7 @@ jobs:
     put: teams-alert
     params:
       title: |
-        $BUILD_PIPELINE_NAME Demo-Green Deploy Failed - Branch: ((branch-name))
+        $BUILD_PIPELINE_NAME Prod-Green Deploy Failed - Branch: ((branch-name))
       text: Job $BUILD_JOB_NAME failed.
       actionName: View Job $BUILD_JOB_NAME Results
       actionTarget: https://concourse-prod.usdc10.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
@@ -319,7 +319,7 @@ jobs:
   - task: prepare-manifest
     image: utility-image
     params:
-      <<: *demo-source
+      <<: *prod-source
     config:
       platform: linux
       inputs:
