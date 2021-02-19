@@ -53,7 +53,7 @@ source: &pcpm-source
       cf_deploy_password: ((cf-preprd-password))
       artifactory-username: ((artifactory-username))
       artifactory-password: ((artifactory-password))
-      cf_app_name: mis-pcpm
+      cf_app_name: media-info-pcpm
       file_prefix: 'mediainfosvc'
       cf_preceding_appname: media-info-int
       cf_space: 'pcpm'
@@ -88,12 +88,12 @@ resource_types:
     repository: navicore/teams-notification-resource
     tag: latest
 
-- name: app-docker-image
+- name: project-metrics
   type: docker-image
   source:
-    repository: ((proget-url))/docker/((docker-image-path))
-    username: ((proget-user))
-    password: ((proget-password))
+    repository: ((internal-docker-addr))/gdc/concourse-projectmetrics-resource-net21
+    username: ((internal-docker-user))
+    password: ((internal-docker-pass))
     tag: latest
 
 - name: cf-resource
@@ -137,15 +137,15 @@ resources:
 - name: dotnet-image
   type: docker-image
   source:
-    repository: ((proget-url))/docker/rms/claimsmanagement/dgclaims/mediainfo-service/mobile-dotnet2.2
+    repository: ((proget-url))/docker/rms/claimsmanagement/dgclaims/mbewrapper/mobile-dotnet2.2
     username: ((proget-user))
     password: ((proget-password))
     tag: "latest"
- 
+
 - name: utility-image
   type: docker-image
   source:
-    repository: ((proget-url))/docker/rms/claimsmanagement/dgclaims/mediainfo-service/mobile-utility
+    repository: ((proget-url))/docker/rms/claimsmanagement/dgclaims/mbewrapper/mobile-utility
     username: ((proget-user))
     password: ((proget-password))
     tag: "latest"
@@ -186,8 +186,8 @@ resources:
     url: ((teams-webhook-url))
 
 - name: project-metrics
-   type: project-metrics
-   source:
+  type: project-metrics
+  source:
     jiraboard: Autosource.Mobile
     apiurl: https://projectmetrics-api-qa.apps-dev.gp2.axadmin.net
     sonartoken: ((sonar-auth-token))
