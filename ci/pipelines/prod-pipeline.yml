@@ -11,8 +11,6 @@ source: &demo-source
       cf_preceding_space: pcpm
       cf_preceding_appname: media-info-pcpm
       cf_preceding_env: dev
-      cf_dev_password: ((cf-dev-deploy-password))
-      cf_dev_user: ((cf-dev-deploy-user))
       instance_number: 2
       memory: 512M
       setautoscale: true
@@ -148,7 +146,7 @@ jobs:
     config:
       platform: linux
       inputs:
-      - name: mbe-wrapper-artifact
+      - name: artifact
       outputs:
       - name: deployables
       run:
@@ -323,7 +321,7 @@ jobs:
     config:
       platform: linux
       inputs:
-      - name: mbe-wrapper-artifact
+      - name: artifact
       outputs:
       - name: deployables
       run:
