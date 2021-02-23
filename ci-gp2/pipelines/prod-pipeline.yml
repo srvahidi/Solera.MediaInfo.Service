@@ -4,17 +4,19 @@ source: &demo-source
       cf_deploy_password: ((cf-prd-password))      
       artifactory-username: ((artifactory-username))
       artifactory-password: ((artifactory-password))
-      cf_app_name: media-info-demo
+      cf_app_name: mis-demo
       file_prefix: 'mediainfosvc'
       cf_space: 'demo'
       cf_env: 'prod'
       cf_preceding_space: pcpm
-      cf_preceding_appname: media-info-pcpm
+      cf_preceding_appname: mis-pcpm
       cf_preceding_env: dev
+      cf_dev_password: ((cf-dev-deploy-password))
+      cf_dev_user: ((cf-dev-deploy-user))
       instance_number: 2
       memory: 512M
       setautoscale: true
-      cf_api: https://api.system-prod.usdc10.axadmin.net
+      cf_api: https://api.system-prod.gp2.axadmin.net
       aspnetcore_environment: Demo
       s3_access_key: ((s3-access-key))
       s3_bucket: rms-demo
@@ -33,17 +35,17 @@ source: &prod-source
       cf_deploy_password: ((cf-prd-password))      
       artifactory-username: ((artifactory-username))
       artifactory-password: ((artifactory-password))
-      cf_app_name: media-info-prod
+      cf_app_name: mis-prod
       file_prefix: 'mediainfosvc'
       cf_space: 'production'
       cf_env: 'prod'
       cf_preceding_space: demo
-      cf_preceding_appname: media-info-demo
+      cf_preceding_appname: mis-demo
       cf_preceding_env: dev          
       instance_number: 2
       memory: 1G
       setautoscale: true
-      cf_api: https://api.system-prod.usdc10.axadmin.net
+      cf_api: https://api.system-prod.gp2.axadmin.net
       aspnetcore_environment: Production
       s3_access_key: ((s3-access-key))
       s3_bucket: rms-prod
@@ -58,12 +60,6 @@ source: &prod-source
       buildpack_two: '- dotnet_core_buildpack'
 
 resource_types:
-
-- name: artifactory
-  type: docker-image
-  source:
-    repository: pivotalservices/artifactory-resource
-    
 - name: teams-notification
   type: docker-image
   source:
@@ -73,22 +69,12 @@ resource_types:
 - name: cf-resource
   type: docker-image
   source:
-    repository: ((proget-url))/docker/gdc/cf-resource
-    username: ((proget-user))
-    password: ((proget-password))
+    repository: ((internal-docker-addr))/gdc/cf-resource
+    username: ((internal-docker-user))
+    password: ((internal-docker-pass))
     tag: latest
 
-resources:  
-
-- name: artifact
-  type: artifactory
-  source:
-    endpoint: https://na-artifact-01.na.audatex.com:8443/artifactory
-    repository: /mobile-backend/mediainfo-service
-    regex: "mediainfosvc-(?<version>.*).zip"
-    username: ((artifactory-username))
-    password: ((artifactory-password))
-    skip_ssl_verification: true
+resources:   
 
 - name: cf-demo
   type: cf-resource
@@ -113,9 +99,9 @@ resources:
 - name: utility-image
   type: docker-image
   source:
-    repository: ((proget-url))/docker/rms/claimsmanagement/dgclaims/mbewrapper/mobile-utility
-    username: ((proget-user))
-    password: ((proget-password))
+    repository: ((internal-docker-addr))/gdc/mobile-backend/mobile-utility
+    username: ((internal-docker-user))
+    password: ((internal-docker-pass))
     tag: "latest"
 
 - name: teams-alert
@@ -130,32 +116,64 @@ jobs:
     put: teams-alert
     params:
       title: |
-        $BUILD_PIPELINE_NAME Demo-Green Deploy Failed - Branch: ((branch-name))
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
       text: Job $BUILD_JOB_NAME failed.
       actionName: View Job $BUILD_JOB_NAME Results
-      actionTarget: https://concourse-prod.usdc10.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
-  - in_parallel:
-    - get: utility-image
-    - get: artifact
-      trigger: true
+  - get: utility-image
+    trigger: false    
   - task: prepare-manifest
     image: utility-image
     params:
       <<: *demo-source
     config:
       platform: linux
-      inputs:
-      - name: artifact
       outputs:
       - name: deployables
       run:
         path: sh
         args:
         - -exc
-        - |
+        - |  
+          set +x
+          cfpass=$(printenv cf_deploy_password)
+          cfuser=$(printenv cf_deploy_user)
+          artifactorypass=$(printenv artifactory-password)
+          artifactoryuser=$(printenv artifactory-username)
+          cfappname=$(printenv cf_app_name)                
+          
+          if [ "$cf_space" == "demo" ]; then
+            cf login -u $cf_dev_user -p $cf_dev_password -a https://api.system-$cf_preceding_env.gp2.axadmin.net -o $cf_organization -s $cf_preceding_space
+            precedingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_preceding_appname.apps-$cf_preceding_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+            cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
+            workingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_app_name.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+            set -x            
+          else
+            cf login -u $cfuser -p $cfpass -a $cf_api -o $cf_organization -s $cf_space
+            precedingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_preceding_appname.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+            echo "precedingversion" echo $precedingversion
+            workingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_app_name.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+            set -x            
+            echo "workingversion" echo $workingversion
+          fi
+          
+          if [ "$workingversion" = "$precedingversion" ]; then
+          echo "Skipping deployment...New version not available for deployment"
+          exit 0;
+          fi
+          index=`expr index "${precedingversion}" g`
+          git=$(echo ${precedingversion:$index})
+          artifact=$file_prefix-${precedingversion}.zip
+
+          #download zip file
+          set +x
+          curl -OL -k -u $artifactoryuser:$artifactorypass https://na-artifact-01.na.audatex.com:8443/artifactory/mobile-backend/mediainfo-service/$artifact
+          set -x
+
+          #extract zip
           output_directory=${PWD}/deployables
-          unzip ${PWD}/artifact/mediainfosvc-*.zip -d ${output_directory}
+          unzip -q $artifact -d $output_directory
           manifest_file=${output_directory}/manifest.yml
 
           echo "Listing the directory"
@@ -189,7 +207,7 @@ jobs:
         $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
       text: Job $BUILD_JOB_NAME failed.
       actionName: View Job $BUILD_JOB_NAME Results
-      actionTarget: https://concourse-dev.usdc10.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
   - in_parallel:
     - get: utility-image 
@@ -210,7 +228,7 @@ jobs:
         - |
           cfpass=$(printenv cf_deploy_password)
           cfuser=$(printenv cf_deploy_user)
-          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.usdc10.axadmin.net -o $cf_organization -s $cf_space
+          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
           set -x
 
           app_url=$(cf app $cf_app_name-green | grep routes | sed -e 's/routes:\s*/https:\/\//')
@@ -229,7 +247,7 @@ jobs:
         $BUILD_PIPELINE_NAME Demo deployed successfully
       text: Job $BUILD_JOB_NAME successful.
       actionName: View Job $BUILD_JOB_NAME Results
-      actionTarget: https://concourse-prod.usdc10.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   on_failure:
     put: teams-alert
     params:
@@ -237,7 +255,7 @@ jobs:
         $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
       text: Job $BUILD_JOB_NAME failed.
       actionName: View Job $BUILD_JOB_NAME Results
-      actionTarget: https://concourse-prod.usdc10.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
   - in_parallel:
     - get: utility-image
@@ -259,17 +277,17 @@ jobs:
           set +x
           cfpass=$(printenv cf_deploy_password)
           cfuser=$(printenv cf_deploy_user)
-          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.usdc10.axadmin.net -o $cf_organization -s $cf_space
+          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
           set -x
           greenApps=$(cf apps | grep $cf_app_name-green | { grep -v grep || true; })
           if [[ -z $greenApps ]]; then exit 0; fi
-          cf map-route $cf_app_name-green apps-$cf_env.usdc10.axadmin.net -n $cf_app_name
-          cf unmap-route $cf_app_name apps-$cf_env.usdc10.axadmin.net -n $cf_app_name
-          cf unmap-route $cf_app_name-green apps-$cf_env.usdc10.axadmin.net -n $cf_app_name-green
+          cf map-route $cf_app_name-green apps-$cf_env.gp2.axadmin.net -n $cf_app_name
+          cf unmap-route $cf_app_name apps-$cf_env.gp2.axadmin.net -n $cf_app_name
+          cf unmap-route $cf_app_name-green apps-$cf_env.gp2.axadmin.net -n $cf_app_name-green
           cf stop $cf_app_name
           cf delete $cf_app_name -f
           # Remove the Green-Temp-Route.
-          cf delete-route apps-$cf_env.usdc10.axadmin.net --hostname $cf_app_name-green -f
+          cf delete-route apps-$cf_env.gp2.axadmin.net --hostname $cf_app_name-green -f
           # Rename Green app to Blue app.
           cf rename $cf_app_name-green $cf_app_name
   - task: autoscaling
@@ -287,7 +305,7 @@ jobs:
         - -exc
         - |
           set +x
-          cf login -u $cf_deploy_user -p $cf_deploy_password -a https://api.system-$cf_env.usdc10.axadmin.net -o $cf_organization -s $cf_space
+          cf login -u $cf_deploy_user -p $cf_deploy_password -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
           set -x
           if [ $setautoscale == true ]; then
             cf bind-service $cf_app_name autoscale
@@ -305,32 +323,57 @@ jobs:
     put: teams-alert
     params:
       title: |
-        $BUILD_PIPELINE_NAME Prod-Green Deploy Failed - Branch: ((branch-name))
+        $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
       text: Job $BUILD_JOB_NAME failed.
       actionName: View Job $BUILD_JOB_NAME Results
-      actionTarget: https://concourse-prod.usdc10.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
-  - in_parallel:
-    - get: utility-image
-    - get: artifact
-      trigger: true
+  - get: utility-image
+    trigger: false    
   - task: prepare-manifest
     image: utility-image
     params:
       <<: *prod-source
     config:
       platform: linux
-      inputs:
-      - name: artifact
       outputs:
       - name: deployables
       run:
         path: sh
         args:
         - -exc
-        - |
+        - |  
+          set +x
+          cfpass=$(printenv cf_deploy_password)
+          cfuser=$(printenv cf_deploy_user)
+          artifactorypass=$(printenv artifactory-password)
+          artifactoryuser=$(printenv artifactory-username)
+          cfappname=$(printenv cf_app_name)                
+          
+          cf login -u $cfuser -p $cfpass -a $cf_api -o $cf_organization -s $cf_space
+          precedingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_preceding_appname.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+          echo "precedingversion" echo $precedingversion
+          workingversion=$(curl --header "Authorization: $(cf oauth-token)" https://$cf_app_name.apps-$cf_env.gp2.axadmin.net/cloudfoundryapplication/info | jq -r ".[] | {tags}[]" | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
+          set -x
+          echo "workingversion" echo $workingversion          
+
+          if [ "$workingversion" = "$precedingversion" ]; then
+          echo "Skipping deployment...New version not available for deployment"
+          exit 0;
+          fi
+
+          index=`expr index "${precedingversion}" g`
+          git=$(echo ${precedingversion:$index})
+          artifact=$file_prefix-${precedingversion}.zip
+
+          #download zip file
+          set +x
+          curl -OL -k -u $artifactoryuser:$artifactorypass https://na-artifact-01.na.audatex.com:8443/artifactory/mobile-backend/mediainfo-service/$artifact
+          set -x
+
+          #extract zip
           output_directory=${PWD}/deployables
-          unzip ${PWD}/artifact/mediainfosvc-*.zip -d ${output_directory}
+          unzip -q $artifact -d $output_directory
           manifest_file=${output_directory}/manifest.yml
 
           echo "Listing the directory"
@@ -364,7 +407,7 @@ jobs:
         $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
       text: Job $BUILD_JOB_NAME failed.
       actionName: View Job $BUILD_JOB_NAME Results
-      actionTarget: https://concourse-dev.usdc10.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+      actionTarget: https://concourse-dev.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
   - in_parallel:
     - get: utility-image 
@@ -385,7 +428,7 @@ jobs:
         - |
           cfpass=$(printenv cf_deploy_password)
           cfuser=$(printenv cf_deploy_user)
-          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.usdc10.axadmin.net -o $cf_organization -s $cf_space
+          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
           set -x
 
           app_url=$(cf app $cf_app_name-green | grep routes | sed -e 's/routes:\s*/https:\/\//')
@@ -404,7 +447,7 @@ jobs:
         $BUILD_PIPELINE_NAME Prod deployed successfully
       text: Job $BUILD_JOB_NAME successful.
       actionName: View Job $BUILD_JOB_NAME Results
-      actionTarget: https://concourse-prod.usdc10.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   on_failure:
     put: teams-alert
     params:
@@ -412,7 +455,7 @@ jobs:
         $BUILD_PIPELINE_NAME - $BUILD_JOB_NAME Failed
       text: Job $BUILD_JOB_NAME failed.
       actionName: View Job $BUILD_JOB_NAME Results
-      actionTarget: https://concourse-prod.usdc10.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+      actionTarget: https://concourse-prod.gp2.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
   plan:
   - in_parallel:
     - get: utility-image
@@ -434,17 +477,17 @@ jobs:
           set +x
           cfpass=$(printenv cf_deploy_password)
           cfuser=$(printenv cf_deploy_user)
-          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.usdc10.axadmin.net -o $cf_organization -s $cf_space
+          cf login -u $cfuser -p $cfpass -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
           set -x
           greenApps=$(cf apps | grep $cf_app_name-green | { grep -v grep || true; })
           if [[ -z $greenApps ]]; then exit 0; fi
-          cf map-route $cf_app_name-green apps-$cf_env.usdc10.axadmin.net -n $cf_app_name
-          cf unmap-route $cf_app_name apps-$cf_env.usdc10.axadmin.net -n $cf_app_name
-          cf unmap-route $cf_app_name-green apps-$cf_env.usdc10.axadmin.net -n $cf_app_name-green
+          cf map-route $cf_app_name-green apps-$cf_env.gp2.axadmin.net -n $cf_app_name
+          cf unmap-route $cf_app_name apps-$cf_env.gp2.axadmin.net -n $cf_app_name
+          cf unmap-route $cf_app_name-green apps-$cf_env.gp2.axadmin.net -n $cf_app_name-green
           cf stop $cf_app_name
           cf delete $cf_app_name -f
           # Remove the Green-Temp-Route.
-          cf delete-route apps-$cf_env.usdc10.axadmin.net --hostname $cf_app_name-green -f
+          cf delete-route apps-$cf_env.gp2.axadmin.net --hostname $cf_app_name-green -f
           # Rename Green app to Blue app.
           cf rename $cf_app_name-green $cf_app_name
   - task: autoscaling
@@ -462,7 +505,7 @@ jobs:
         - -exc
         - |
           set +x
-          cf login -u $cf_deploy_user -p $cf_deploy_password -a https://api.system-$cf_env.usdc10.axadmin.net -o $cf_organization -s $cf_space
+          cf login -u $cf_deploy_user -p $cf_deploy_password -a https://api.system-$cf_env.gp2.axadmin.net -o $cf_organization -s $cf_space
           set -x
           if [ $setautoscale == true ]; then
             cf bind-service $cf_app_name autoscale
@@ -476,13 +519,13 @@ jobs:
           fi
 groups:
 
-- name: mediainfo-service-demo
+- name: mis-demo
   jobs:
   - deploy-green-demo
   - smoke-test-green-demo
   - blue-green-switch-demo
 
-- name: mediainfo-service-prod
+- name: mis-prod
   jobs:
   - deploy-green-prod
   - smoke-test-green-prod
