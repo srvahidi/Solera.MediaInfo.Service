@@ -54,7 +54,7 @@ spec:
               value: "rms-prod"
             - name: S3_SECRET_KEY
               value: "l5gHn+mWguJ3Z6S3UFMjigVsdrXqCxYEqZxwqpRB"        
-          image: feeds.axadmin.net/docker/rms/mbe/media-info:latest
+          image: feeds.axadmin.net/docker/rms/mbe/media-info:0.0.1-91-g7cd0c14
           imagePullPolicy: IfNotPresent
           livenessProbe:
             failureThreshold: 10
@@ -70,7 +70,7 @@ spec:
           resources:
             limits:
               ephemeral-storage: "1000000000"
-              memory: 500000Ki
+              memory: 1000000Ki
       restartPolicy: Always
       serviceAccountName: default
 status: {}

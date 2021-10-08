@@ -6,7 +6,7 @@ metadata:
     service: media-info-demo
   name: media-info-demo
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       service: media-info-demo
@@ -54,7 +54,7 @@ spec:
               value: "rms-demo"
             - name: S3_SECRET_KEY
               value: "4LopIDVzfdrvnZhMcibzjIKXZgDaUNJA53hdhM/K"        
-          image: feeds.axadmin.net/docker/rms/mbe/media-info:latest
+          image: feeds.axadmin.net/docker/rms/mbe/media-info:0.0.1-91-g7cd0c14
           imagePullPolicy: IfNotPresent
           livenessProbe:
             failureThreshold: 10

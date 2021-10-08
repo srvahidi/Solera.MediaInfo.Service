@@ -6,7 +6,7 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   rules:
-  - host: media-info-prod.tkg-rms-prd.usdc01.solera.farm
+  - host: media-info-prod.tkg-rms-prod.usdc01.solera.farm
     http:
       paths:
       - backend:
