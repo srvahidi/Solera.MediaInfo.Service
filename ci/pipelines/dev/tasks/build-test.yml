@@ -16,7 +16,7 @@ run:
     
     cd ..
     output_directory=${PWD}/artifact
-    cd $cf_app_name_ex.test
+    cd git-repo/$cf_app_name_ex.test
     dotnet test -c release      
 
     cd ..
