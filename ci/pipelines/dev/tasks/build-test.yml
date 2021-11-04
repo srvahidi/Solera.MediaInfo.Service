@@ -12,27 +12,29 @@ run:
     set -x     
     # format the version so that we can use lexicographic search to find the latest
     version=$(git describe | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')
-    filename=${cf_app_name_ex}-${version}.zip
+    service=${cf_app_name_ex}.Service
+    test=${cf_app_name_ex}.Test
+    filename=${service}-${version}.zip
     
     cd ..
     output_directory=${PWD}/artifact
-    cd git-repo/$cf_app_name_ex.Test
+    cd git-repo/${test}
     dotnet test -c release      
 
     cd ..
-    cd $cf_app_name_ex
+    cd ${service}
     dotnet publish -c release -o ./bin/release/netcoreapp/publish
     
     git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:"%h %aI %s" --no-merges > ./bin/release/netcoreapp/publish/gitlog.txt
 
     cd ..
-    mkdir -p ${PWD}/${cf_app_name_ex}/bin/release/netcoreapp/publish/ci
-    cp -r ${PWD}/ci/. ${PWD}/${cf_app_name_ex}/bin/release/netcoreapp/publish/ci
+    mkdir -p ${PWD}/${service}/bin/release/netcoreapp/publish/ci
+    cp -r ${PWD}/ci/. ${PWD}/${service}/bin/release/netcoreapp/publish/ci
     
-    mkdir -p ${PWD}/${cf_app_name_ex}/bin/release/netcoreapp/publish/results
-    echo $version > ${PWD}/${cf_app_name_ex}/bin/release/netcoreapp/publish/results/version-tag.txt
+    mkdir -p ${PWD}/${service}/bin/release/netcoreapp/publish/results
+    echo $version > ${PWD}/${service}/bin/release/netcoreapp/publish/results/version-tag.txt
             
-    tar -xvf ${PWD}/ci/docker/binfiles/newrelic-netcore20-agent_8.21.34.0_amd64.tar.gz -C ${PWD}/${cf_app_name_ex}/bin/release/netcoreapp/publish/
+    tar -xvf ${PWD}/ci/docker/binfiles/newrelic-netcore20-agent_8.21.34.0_amd64.tar.gz -C ${PWD}/${service}/bin/release/netcoreapp/publish/
         
-    cd ${PWD}/${cf_app_name_ex}/bin/release/netcoreapp/publish
+    cd ${PWD}/${service}/bin/release/netcoreapp/publish
     #zip -r ${output_directory}/${filename} ./* 
