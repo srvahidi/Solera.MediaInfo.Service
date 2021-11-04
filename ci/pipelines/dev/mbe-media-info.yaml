@@ -1,0 +1,179 @@
+groups:
+- jobs:
+  - build-and-test-green
+  - build-deployable-mbe-media-info
+  name: mbe-media-info-dev
+jobs:
+- name: build-and-test-green
+  on_failure:
+    params:
+      actionName: View Job $BUILD_JOB_NAME Results
+      actionTarget: https://concourse-dev.usdc10.axadmin.net/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME
+      text: Job $BUILD_JOB_NAME failed.
+      title: |
+        $BUILD_PIPELINE_NAME Build-and-test-green Failed* - Branch: master
+    put: teams-alert
+  plan:
+  - get: dotnet-image
+  - get: git-repo
+    trigger: true
+    version: every
+  - file: git-repo/ci/pipelines/dev/tasks/build-test.yml
+    image: dotnet-image
+    params:
+      cf_app_name_ex: Solera.MediaInfo
+    task: build-test
+- name: build-deployable-mbe-media-info
+  on_failure:
+    in_parallel:
+      steps:
+      - params:
+          actionName: View in Concourse
+          actionTarget: https://usdc01-concourse-dev.solera.farm/builds/$BUILD_ID
+          color: FE4250
+          text: Build $BUILD_JOB_NAME Failed
+          title: mbe-media-info-dev
+        put: teams-alert
+      - params:
+          actionName: View in Concourse
+          actionTarget: https://usdc01-concourse-dev.solera.farm/builds/$BUILD_ID
+          color: FE4250
+          text: Build $BUILD_JOB_NAME Failed
+          title: mbe-media-info-dev
+        put: teams-error-alert
+  plan:
+  - in_parallel:
+      steps:     
+      - get: git-repo
+        passed:
+        - build-and-test-green
+        trigger: true
+      - get: dotnet-image
+  - config:
+      inputs:
+      - name: git-repo
+      outputs:
+      - name: service-deployables
+      platform: linux
+      run:
+        args:
+        - -exc
+        - |
+            set -x
+                         
+            output_directory=${PWD}/service-deployables
+            mkdir -p ${output_directory}
+            cd git-repo/$cf_app_name_ex
+
+            # format the version so that we can use lexicographic search to find the latest    
+            version=$(git describe | awk -F- '{printf "%s-%04d-%s", $1, $2, $3}')           
+            
+            dotnet publish -c release -o ./bin/release/netcoreapp/publish
+            
+            git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:"%h %aI %s" --no-merges > ./bin/release/netcoreapp/publish/gitlog.txt
+
+            cd ..
+            mkdir -p ${PWD}/${cf_app_name_ex}/bin/release/netcoreapp/publish/ci
+            cp -r ${PWD}/ci/. ${PWD}/${cf_app_name_ex}/bin/release/netcoreapp/publish/ci
+            
+            mkdir -p ${PWD}/${cf_app_name_ex}/bin/release/netcoreapp/publish/results
+            echo $version > ${PWD}/${cf_app_name_ex}/bin/release/netcoreapp/publish/results/version-tag.txt
+            
+            tar -xvf ${PWD}/ci/docker/binfiles/newrelic-netcore20-agent_8.21.34.0_amd64.tar.gz -C ${PWD}/${cf_app_name_ex}/bin/release/netcoreapp/publish/
+        
+            cp -r ${PWD}/${cf_app_name_ex}/bin/release/netcoreapp/publish/. ${output_directory}
+        path: bash        
+    image: dotnet-image
+    params:
+        cf_app_name_ex: Solera.MediaInfo.Service
+    task: build-deployable        
+  - config:
+      inputs:
+      - name: service-deployables
+      outputs:
+      - name: service-deployables
+      platform: linux
+      run:
+        args:
+        - -exc
+        - |
+          set -x     
+          env=$ENV_NAME
+          DOCKER_TAG=(`cat service-deployables/results/version-tag.txt`)
+          sed -i "s/:VERSION/:$DOCKER_TAG/" service-deployables/ci/tanzu/$env/deployment.yaml
+          cat service-deployables/ci/tanzu/$env/deployment.yaml | grep "image:"          
+        path: bash        
+    image: dotnet-image
+    params:
+      ENV_NAME: dev
+    task: prepare-k8s
+  - params:
+      path: service-deployables
+      build: ./
+      dockerfile: service-deployables/ci/docker/media-info.dockerfile
+      tag_file: service-deployables/results/version-tag.txt
+      tag_as_latest: true  
+    put: docker-mbe-media-info 
+  - params:
+      file: service-deployables/ci/tanzu/dev
+    put: kubectl-dev
+  - params:
+      actionName: View Build Result
+      actionTarget: https://usdc01-concourse-dev.solera.farm/builds/$BUILD_ID
+      color: 2BB673
+      text: "Build $BUILD_JOB_NAME Success! \n$TEXT_FILE_CONTENT\n"
+      title: mbe-media-info-dev
+    put: teams-alert
+  serial: true 
+resource_types:
+- name: concourse-kubectl
+  source:
+    username: ((proget-user))
+    password: ((proget-password))
+    repository: feeds.axadmin.net/docker/gito/concourse-kubectl-resource
+    tag: latest
+  type: docker-image
+- name: teams-notification
+  source:
+    username: ((proget-user))
+    password: ((proget-password))
+    repository: feeds.axadmin.net/docker/navicore/teams-notification-resource
+    tag: latest
+  type: docker-image 
+resources:
+- icon: kubernetes
+  name: kubectl-dev
+  source:
+    api_server_uri: ((dev-cluster.api-server))
+    certificate_authority_data: ((dev-cluster.ca))
+    namespace: rms-dev-mbe
+    token: ((dev-cluster.token))
+  type: concourse-kubectl
+- name: docker-mbe-media-info
+  type: docker-image
+  source:
+    repository: ((proget-url))/docker/rms/mbe/media-info
+    username: ((proget-user))
+    password: ((proget-password))   
+    tag: latest 
+- name: dotnet-image
+  type: docker-image
+  source:
+    repository: ((proget-url))/docker/rms/claimsmanagement/dgclaims/mbewrapper/mobile-dotnet2.2
+    username: ((proget-user))
+    password: ((proget-password))   
+    tag: latest 
+- name: git-repo
+  source:
+    branch: master
+    private_key: ((mobile-backend.private-repo-key))
+    uri: git@bitbucket.org:SoleraNA/solera.mediainfo.service.git
+  type: git
+- name: teams-alert
+  source:
+    url: ((mobile-backend.teams-url))
+  type: teams-notification
+- name: teams-error-alert
+  source:
+    url: ((mobile-backend.teams-url))
+  type: teams-notification  

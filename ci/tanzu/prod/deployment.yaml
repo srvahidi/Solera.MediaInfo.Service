@@ -54,7 +54,7 @@ spec:
               value: "rms-prod"
             - name: S3_SECRET_KEY
               value: "l5gHn+mWguJ3Z6S3UFMjigVsdrXqCxYEqZxwqpRB"        
-          image: feeds.axadmin.net/docker/rms/mbe/media-info:0.0.1-91-g7cd0c14
+          image: feeds.axadmin.net/docker/rms/mbe/media-info:VERSION
           imagePullPolicy: IfNotPresent
           livenessProbe:
             failureThreshold: 10

@@ -54,7 +54,7 @@ spec:
               value: "rms-pcpm"
             - name: S3_SECRET_KEY
               value: "sy9E50QmVqU1chI7IER/2smarrinJtIBYWQhdEJa"        
-          image: feeds.axadmin.net/docker/rms/mbe/media-info:latest
+          image: feeds.axadmin.net/docker/rms/mbe/media-info:VERSION
           imagePullPolicy: IfNotPresent
           livenessProbe:
             failureThreshold: 10

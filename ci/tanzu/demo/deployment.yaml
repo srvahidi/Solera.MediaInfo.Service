@@ -54,7 +54,7 @@ spec:
               value: "rms-demo"
             - name: S3_SECRET_KEY
               value: "4LopIDVzfdrvnZhMcibzjIKXZgDaUNJA53hdhM/K"        
-          image: feeds.axadmin.net/docker/rms/mbe/media-info:0.0.1-91-g7cd0c14
+          image: feeds.axadmin.net/docker/rms/mbe/media-info:VERSION
           imagePullPolicy: IfNotPresent
           livenessProbe:
             failureThreshold: 10
