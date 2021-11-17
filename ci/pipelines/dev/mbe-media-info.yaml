@@ -78,6 +78,7 @@ jobs:
             
             mkdir -p ${PWD}/${cf_app_name_ex}/bin/release/netcoreapp/publish/results
             echo $version > ${PWD}/${cf_app_name_ex}/bin/release/netcoreapp/publish/results/version-tag.txt
+            echo $version > ${PWD}/${cf_app_name_ex}/bin/release/netcoreapp/publish/version.txt
             
             tar -xvf ${PWD}/ci/docker/binfiles/newrelic-netcore20-agent_8.21.34.0_amd64.tar.gz -C ${PWD}/${cf_app_name_ex}/bin/release/netcoreapp/publish/
         
