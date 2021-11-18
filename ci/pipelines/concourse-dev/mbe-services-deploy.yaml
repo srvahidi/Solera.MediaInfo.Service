@@ -1,0 +1,386 @@
+groups:
+- jobs:
+  - deploy-dev-mbe-notifications
+  - deploy-dev-mbe-wrapper
+  - deploy-dev-mbe-media-info  
+  - deploy-dev-mbe-mobile-claim-jobs
+  name: dev
+- jobs:
+  - deploy-qa-mbe-notifications
+  - deploy-qa-mbe-wrapper
+  - deploy-qa-mbe-media-info
+  - deploy-qa-mbe-mobile-claim-jobs
+  name: qa
+jobs:
+- name: deploy-dev-mbe-notifications
+  plan:
+  - in_parallel:
+      steps:
+      - get: git-repo-mbe-notifications
+      - get: version-dev-mbe-notifications
+      - get: dotnet-image
+        trigger: true
+        version: every
+  - config:
+      inputs:
+      - name: git-repo-mbe-notifications
+      - name: version-dev-mbe-notifications
+      outputs:
+      - name: git-repo-mbe-notifications
+      platform: linux
+      run:
+        args:
+        - -exc
+        - |
+          set -x
+          DOCKER_TAG=(`cat version-dev-mbe-notifications/dev/mbe-notifications.json | jq -r ".version"`)
+          sed -i "s/:VERSION/:$DOCKER_TAG/" git-repo-mbe-notifications/ci/tanzu/dev/deployment.yaml
+          cat git-repo-mbe-notifications/ci/tanzu/dev/deployment.yaml | grep "image:"
+        path: bash
+    image: dotnet-image
+    task: prepare-k8s
+  - params:
+      file: git-repo-mbe-notifications/ci/tanzu/dev
+    put: kubectl-dev    
+- name: deploy-dev-mbe-wrapper
+  plan:
+  - in_parallel:
+      steps:
+      - get: git-repo-mbe-wrapper
+      - get: version-dev-mbe-wrapper
+      - get: dotnet-image
+        trigger: true
+        version: every        
+  - config:
+      inputs:
+      - name: git-repo-mbe-wrapper
+      - name: version-dev-mbe-wrapper
+      outputs:
+      - name: git-repo-mbe-wrapper
+      platform: linux
+      run:
+        args:
+        - -exc
+        - |
+          set -x
+          DOCKER_TAG=(`cat version-dev-mbe-wrapper/dev/mbe-wrapper.json | jq -r ".version"`)
+          sed -i "s/:VERSION/:$DOCKER_TAG/" git-repo-mbe-wrapper/ci/tanzu/dev/deployment.yaml
+          cat git-repo-mbe-wrapper/ci/tanzu/dev/deployment.yaml | grep "image:"
+        path: bash
+    image: dotnet-image
+    task: prepare-k8s
+  - params:
+      file: git-repo-mbe-wrapper/ci/tanzu/dev
+    put: kubectl-dev    
+- name: deploy-dev-mbe-media-info
+  plan:
+  - in_parallel:
+      steps:
+      - get: git-repo-mbe-media-info
+      - get: version-dev-mbe-media-info
+      - get: dotnet-image
+        trigger: true
+        version: every        
+  - config:
+      inputs:
+      - name: git-repo-mbe-media-info
+      - name: version-dev-mbe-media-info
+      outputs:
+      - name: git-repo-mbe-media-info
+      platform: linux
+      run:
+        args:
+        - -exc
+        - |
+          set -x
+          DOCKER_TAG=(`cat version-dev-mbe-media-info/dev/mbe-media-info.json | jq -r ".version"`)
+          sed -i "s/:VERSION/:$DOCKER_TAG/" git-repo-mbe-media-info/ci/tanzu/dev/deployment.yaml
+          cat git-repo-mbe-media-info/ci/tanzu/dev/deployment.yaml | grep "image:"
+        path: bash
+    image: dotnet-image
+    task: prepare-k8s
+  - params:
+      file: git-repo-mbe-media-info/ci/tanzu/dev
+    put: kubectl-dev    
+- name: deploy-dev-mbe-mobile-claim-jobs
+  plan:
+  - in_parallel:
+      steps:
+      - get: git-repo-mbe-mobile-claim-jobs
+      - get: version-dev-mbe-mobile-claim-jobs
+      - get: dotnet-image
+        trigger: true
+        version: every        
+  - config:
+      inputs:
+      - name: git-repo-mbe-mobile-claim-jobs
+      - name: version-dev-mbe-mobile-claim-jobs
+      outputs:
+      - name: git-repo-mbe-mobile-claim-jobs
+      platform: linux
+      run:
+        args:
+        - -exc
+        - |
+          set -x
+          DOCKER_TAG=(`cat version-dev-mbe-mobile-claim-jobs/dev/mbe-mobile-claim-jobs.json | jq -r ".version"`)
+          sed -i "s/:VERSION/:$DOCKER_TAG/" git-repo-mbe-mobile-claim-jobs/ci/tanzu/dev/deployment.yaml
+          cat git-repo-mbe-mobile-claim-jobs/ci/tanzu/dev/deployment.yaml | grep "image:"
+        path: bash
+    image: dotnet-image
+    task: prepare-k8s
+  - params:
+      file: git-repo-mbe-mobile-claim-jobs/ci/tanzu/dev
+    put: kubectl-dev            
+- name: deploy-qa-mbe-notifications
+  plan:
+  - in_parallel:
+      steps:
+      - get: git-repo-mbe-notifications
+      - get: version-qa-mbe-notifications
+      - get: dotnet-image
+        trigger: true
+        version: every        
+  - config:
+      inputs:
+      - name: git-repo-mbe-notifications
+      - name: version-qa-mbe-notifications
+      outputs:
+      - name: git-repo-mbe-notifications
+      platform: linux
+      run:
+        args:
+        - -exc
+        - |
+          set -x
+          DOCKER_TAG=(`cat version-qa-mbe-notifications/qa/mbe-notifications.json | jq -r ".version"`)
+          sed -i "s/:VERSION/:$DOCKER_TAG/" git-repo-mbe-notifications/ci/tanzu/pcpm/deployment.yaml
+          cat git-repo-mbe-notifications/ci/tanzu/pcpm/deployment.yaml | grep "image:"
+        path: bash
+    image: dotnet-image
+    task: prepare-k8s
+  - params:
+      file: git-repo-mbe-notifications/ci/tanzu/pcpm
+    put: kubectl-qa
+- name: deploy-qa-mbe-wrapper
+  plan:
+  - in_parallel:
+      steps:
+      - get: git-repo-mbe-wrapper
+      - get: version-qa-mbe-wrapper
+      - get: dotnet-image
+        trigger: true
+        version: every        
+  - config:
+      inputs:
+      - name: git-repo-mbe-wrapper
+      - name: version-qa-mbe-wrapper
+      outputs:
+      - name: git-repo-mbe-wrapper
+      platform: linux
+      run:
+        args:
+        - -exc
+        - |
+          set -x
+          DOCKER_TAG=(`cat version-qa-mbe-wrapper/qa/mbe-wrapper.json | jq -r ".version"`)
+          sed -i "s/:VERSION/:$DOCKER_TAG/" git-repo-mbe-wrapper/ci/tanzu/pcpm/deployment.yaml
+          cat git-repo-mbe-wrapper/ci/tanzu/pcpm/deployment.yaml | grep "image:"
+        path: bash
+    image: dotnet-image
+    task: prepare-k8s
+  - params:
+      file: git-repo-mbe-wrapper/ci/tanzu/pcpm
+    put: kubectl-qa   
+- name: deploy-qa-mbe-media-info
+  plan:
+  - in_parallel:
+      steps:
+      - get: git-repo-mbe-media-info
+      - get: version-qa-mbe-media-info
+      - get: dotnet-image
+        trigger: true
+        version: every        
+  - config:
+      inputs:
+      - name: git-repo-mbe-media-info
+      - name: version-qa-mbe-media-info
+      outputs:
+      - name: git-repo-mbe-media-info
+      platform: linux
+      run:
+        args:
+        - -exc
+        - |
+          set -x
+          DOCKER_TAG=(`cat version-qa-mbe-media-info/qa/mbe-media-info.json | jq -r ".version"`)
+          sed -i "s/:VERSION/:$DOCKER_TAG/" git-repo-mbe-media-info/ci/tanzu/pcpm/deployment.yaml
+          cat git-repo-mbe-media-info/ci/tanzu/pcpm/deployment.yaml | grep "image:"
+        path: bash
+    image: dotnet-image
+    task: prepare-k8s
+  - params:
+      file: git-repo-mbe-media-info/ci/tanzu/pcpm
+    put: kubectl-qa   
+- name: deploy-qa-mbe-mobile-claim-jobs
+  plan:
+  - in_parallel:
+      steps:
+      - get: git-repo-mbe-mobile-claim-jobs
+      - get: version-qa-mbe-mobile-claim-jobs
+      - get: dotnet-image
+        trigger: true
+        version: every        
+  - config:
+      inputs:
+      - name: git-repo-mbe-mobile-claim-jobs
+      - name: version-qa-mbe-mobile-claim-jobs
+      outputs:
+      - name: git-repo-mbe-mobile-claim-jobs
+      platform: linux
+      run:
+        args:
+        - -exc
+        - |
+          set -x
+          DOCKER_TAG=(`cat version-qa-mbe-mobile-claim-jobs/qa/mbe-mobile-claim-jobs.json | jq -r ".version"`)
+          sed -i "s/:VERSION/:$DOCKER_TAG/" git-repo-mbe-mobile-claim-jobs/ci/tanzu/pcpm/deployment.yaml
+          cat git-repo-mbe-mobile-claim-jobs/ci/tanzu/pcpm/deployment.yaml | grep "image:"
+        path: bash
+    image: dotnet-image
+    task: prepare-k8s
+  - params:
+      file: git-repo-mbe-mobile-claim-jobs/ci/tanzu/pcpm
+    put: kubectl-qa             
+resource_types:
+- name: concourse-kubectl
+  source:
+    password: ((proget-password))
+    repository: feeds.axadmin.net/docker/gito/concourse-kubectl-resource
+    tag: latest
+    username: ((proget-user))
+  type: docker-image
+resources:
+- icon: kubernetes
+  name: kubectl-dev
+  source:
+    api_server_uri: ((dev-cluster.api-server))
+    certificate_authority_data: ((dev-cluster.ca))
+    namespace: rms-dev-mbe
+    token: ((dev-cluster.token))
+  type: concourse-kubectl
+- icon: kubernetes
+  name: kubectl-qa
+  source:
+    api_server_uri: ((qae-cluster.api-server))
+    certificate_authority_data: ((qae-cluster.ca))
+    namespace: rms-qae-mbe
+    token: ((qae-cluster.token))
+  type: concourse-kubectl 
+- icon: git
+  name: git-repo-mbe-notifications
+  source:
+    branch: master
+    private_key: ((mobile-backend.private-repo-key))
+    uri: git@bitbucket.org:SoleraNA/mbe-notifications.git
+  type: git  
+- icon: git
+  name: git-repo-mbe-wrapper
+  source:
+    branch: master
+    private_key: ((mobile-backend.private-repo-key))
+    uri: git@bitbucket.org:SoleraNA/mbewrapper.git
+  type: git   
+- icon: git
+  name: git-repo-mbe-media-info
+  source:
+    branch: master
+    private_key: ((mobile-backend.private-repo-key))
+    uri: git@bitbucket.org:SoleraNA/solera.mediainfo.service.git
+  type: git      
+- icon: git
+  name: git-repo-mbe-mobile-claim-jobs
+  source:
+    branch: master
+    private_key: ((mobile-backend.private-repo-key))
+    uri: git@bitbucket.org:SoleraNA/mobile-claim-jobs.git
+  type: git        
+- icon: git
+  name: version-dev-mbe-notifications
+  source:
+    branch: master
+    paths:
+    - dev/mbe-notifications.json
+    private_key: ((mobile-backend.private-repo-key))
+    uri: git@bitbucket.org:SoleraNA/mbe-services-deploy.git
+  type: git  
+- icon: git
+  name: version-dev-mbe-wrapper
+  source:
+    branch: master
+    paths:
+    - dev/mbe-wrapper.json
+    private_key: ((mobile-backend.private-repo-key))
+    uri: git@bitbucket.org:SoleraNA/mbe-services-deploy.git
+  type: git    
+- icon: git
+  name: version-dev-mbe-media-info
+  source:
+    branch: master
+    paths:
+    - dev/mbe-media-info.json
+    private_key: ((mobile-backend.private-repo-key))
+    uri: git@bitbucket.org:SoleraNA/mbe-services-deploy.git
+  type: git    
+- icon: git
+  name: version-dev-mbe-mobile-claim-jobs
+  source:
+    branch: master
+    paths:
+    - dev/mbe-mobile-claim-jobs.json
+    private_key: ((mobile-backend.private-repo-key))
+    uri: git@bitbucket.org:SoleraNA/mbe-services-deploy.git
+  type: git        
+- icon: git
+  name: version-qa-mbe-notifications
+  source:
+    branch: master
+    paths:
+    - qa/mbe-notifications.json
+    private_key: ((mobile-backend.private-repo-key))
+    uri: git@bitbucket.org:SoleraNA/mbe-services-deploy.git
+  type: git
+- icon: git
+  name: version-qa-mbe-wrapper
+  source:
+    branch: master
+    paths:
+    - qa/mbe-wrapper.json
+    private_key: ((mobile-backend.private-repo-key))
+    uri: git@bitbucket.org:SoleraNA/mbe-services-deploy.git
+  type: git      
+- icon: git
+  name: version-qa-mbe-media-info
+  source:
+    branch: master
+    paths:
+    - qa/mbe-media-info.json
+    private_key: ((mobile-backend.private-repo-key))
+    uri: git@bitbucket.org:SoleraNA/mbe-services-deploy.git
+  type: git        
+- icon: git
+  name: version-qa-mbe-mobile-claim-jobs
+  source:
+    branch: master
+    paths:
+    - qa/mbe-mobile-claim-jobs.json
+    private_key: ((mobile-backend.private-repo-key))
+    uri: git@bitbucket.org:SoleraNA/mbe-services-deploy.git
+  type: git          
+- name: dotnet-image
+  source:
+    repository: ((proget-url))/docker/eagle_backend_services/eagle_dotnet
+    username: ((proget-user))
+    password: ((proget-password))   
+    tag: latest
+  type: docker-image
