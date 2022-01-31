@@ -160,7 +160,7 @@ resources:
 - name: dotnet-image
   type: docker-image
   source:
-    repository: ((proget-url))/docker/rms/claimsmanagement/dgclaims/mbewrapper/mobile-dotnet2.2
+    repository: ((proget-url))/docker/rms/mbe/mbe-wrapper-dotnet
     username: ((proget-user))
     password: ((proget-password))   
     tag: latest 
